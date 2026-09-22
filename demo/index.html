@@ -1,0 +1,168 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>B站 · 本地演示页（刷B站插件）</title>
+    <!-- 直接复用扩展的真实样式，演示里看到什么，装到 B 站上就是什么 -->
+    <link rel="stylesheet" href="/src/styles.css" />
+    <style>
+      /* 下面这些只是「假 B 站页面」，用来验证打开视频流时会不会盖住/干扰原页面 */
+      :root {
+        --pink: #fb7299;
+      }
+      * {
+        box-sizing: border-box;
+      }
+      body {
+        margin: 0;
+        background: #f6f7f8;
+        color: #18191c;
+        font: 14px/1.6 -apple-system, BlinkMacSystemFont, 'PingFang SC', 'Microsoft YaHei', 'Segoe UI', sans-serif;
+      }
+      .fake-header {
+        height: 56px;
+        background: #fff;
+        border-bottom: 1px solid #e3e5e7;
+        display: flex;
+        align-items: center;
+        gap: 16px;
+        padding: 0 24px;
+        position: sticky;
+        top: 0;
+        z-index: 10;
+      }
+      .fake-logo {
+        font-weight: 800;
+        color: var(--pink);
+        font-size: 18px;
+      }
+      .fake-search {
+        flex: 1;
+        max-width: 460px;
+        height: 34px;
+        border: 1px solid #e3e5e7;
+        border-radius: 8px;
+        padding: 0 12px;
+        color: #9499a0;
+        display: flex;
+        align-items: center;
+      }
+      .fake-grid {
+        max-width: 1180px;
+        margin: 18px auto 80px;
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(230px, 1fr));
+        gap: 18px;
+        padding: 0 24px;
+      }
+      .fake-card {
+        background: #fff;
+        border-radius: 8px;
+        overflow: hidden;
+        box-shadow: 0 1px 3px rgba(0, 0, 0, 0.06);
+      }
+      .fake-thumb {
+        aspect-ratio: 16 / 9;
+        background: linear-gradient(135deg, #ffd6e2, #cfe6ff);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        color: #8493a6;
+        font-size: 12px;
+      }
+      .fake-title {
+        padding: 8px 10px 12px;
+        font-size: 13px;
+        color: #18191c;
+      }
+      .fake-note {
+        max-width: 1180px;
+        margin: 14px auto 0;
+        padding: 12px 18px;
+        background: #fff8e6;
+        border: 1px solid #ffe1a8;
+        border-radius: 10px;
+        color: #7a5a00;
+        font-size: 13px;
+        line-height: 1.7;
+        margin-inline: 24px;
+      }
+      .fake-note code {
+        background: rgba(0, 0, 0, 0.06);
+        border-radius: 4px;
+        padding: 1px 5px;
+      }
+      @media (min-width: 1240px) {
+        .fake-note {
+          margin-inline: auto;
+        }
+      }
+      h2.section {
+        max-width: 1180px;
+        margin: 22px auto 0;
+        padding: 0 24px;
+        font-size: 18px;
+      }
+      @media (min-width: 1240px) {
+        h2.section {
+          padding: 0;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <div class="fake-header">
+      <span class="fake-logo">bilibili 演示</span>
+      <div class="fake-search">搜索「刷B站」…</div>
+    </div>
+
+    <div class="fake-note">
+      <b>这是本地演示页</b>，不是真的 B 站。页面上所有视频、封面、弹幕、评论都是
+      <code>demo/demo-server.mjs</code> 现造的假数据，用来离线验证滑动手感与交互。
+      <br />
+      右下角粉色按钮 / <code>Alt</code>+<code>Shift</code>+<code>B</code> / <code>\</code> 打开竖滑视频流；
+      <code>Esc</code> 退出。想看「打开时隐藏原页面」的效果，可以点右下角按钮后再按 <code>Esc</code> 来回对比。
+    </div>
+
+    <h2 class="section">首页推荐</h2>
+    <div class="fake-grid" id="fake-grid"></div>
+
+    <script>
+      // 铺一堆假卡片，撑出真实页面的滚动高度
+      const grid = document.getElementById('fake-grid');
+      for (let i = 0; i < 24; i++) {
+        const card = document.createElement('div');
+        card.className = 'fake-card';
+        card.innerHTML =
+          '<div class="fake-thumb">原页面内容 ' +
+          (i + 1) +
+          '</div><div class="fake-title">这是一个假的 B 站视频卡片，用来看视频流有没有正确盖住页面</div>';
+        grid.append(card);
+      }
+    </script>
+
+    <!-- 与扩展 manifest 完全相同的加载顺序 -->
+    <script src="/src/core.js"></script>
+    <script src="/src/config.js"></script>
+    <script src="/src/api.js"></script>
+    <script src="/src/feed.js"></script>
+    <script src="/src/icons.js"></script>
+    <script src="/src/ui/sheets.js"></script>
+    <script src="/src/ui/player.js"></script>
+    <script src="/src/ui/actionbar.js"></script>
+    <script src="/src/ui/comments.js"></script>
+    <script src="/src/ui/settings.js"></script>
+    <script src="/src/ui/overlay.js"></script>
+    <script src="/demo/demo-boot.js"></script>
+    <script src="/src/content.js"></script>
+    <script>
+      // 演示环境：自动进入视频流，并打开调试日志
+      BBDY.debug = true;
+      BBDY.log('demo ready', BBDY.runtime, BBDY.apiBase);
+      setTimeout(() => {
+        BBDY.toggleOverlay(true);
+      }, 120);
+    </script>
+  </body>
+</html>

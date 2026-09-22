@@ -1,0 +1,21 @@
+# 依赖与本地缓存（本项目运行扩展不需要任何依赖）
+node_modules/
+.npm-cache/
+.tools/
+package-lock.json
+
+# 构建/测试产物
+*.log
+dist/
+build/
+
+# 编辑器与系统
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# 本地私货
+*.local
+scratch/

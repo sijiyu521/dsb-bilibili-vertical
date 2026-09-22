@@ -1,0 +1,65 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>刷B站</title>
+    <link rel="stylesheet" href="popup.css" />
+  </head>
+  <body>
+    <header class="hero">
+      <div class="logo">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 6.5 19 12l-10 5.5z" fill="currentColor" /></svg>
+      </div>
+      <div class="hero-text">
+        <h1>刷B站</h1>
+        <p>把 B 站刷成竖屏短视频</p>
+      </div>
+    </header>
+
+    <main>
+      <button id="toggle" class="primary">
+        <span class="dot"></span>
+        <span id="toggle-label">打开竖滑视频流</span>
+      </button>
+      <p id="hint" class="hint">在 bilibili.com 页面使用；也可以用 <kbd>Alt</kbd>+<kbd>Shift</kbd>+<kbd>B</kbd></p>
+
+      <section class="settings">
+        <label class="row">
+          <span>右下角悬浮入口</span>
+          <input type="checkbox" id="showLauncher" />
+        </label>
+        <label class="row">
+          <span>打开时隐藏原页面</span>
+          <input type="checkbox" id="hideRelated" />
+        </label>
+        <label class="row">
+          <span>静音启动</span>
+          <input type="checkbox" id="muteOnStart" />
+        </label>
+        <label class="row">
+          <span>显示弹幕</span>
+          <input type="checkbox" id="danmaku" />
+        </label>
+        <label class="row">
+          <span>自动连播</span>
+          <input type="checkbox" id="autoplay" />
+        </label>
+        <label class="row">
+          <span>默认来源</span>
+          <select id="source">
+            <option value="recommend">推荐</option>
+            <option value="popular">热门</option>
+            <option value="ranking">排行榜</option>
+            <option value="follow">关注</option>
+          </select>
+        </label>
+      </section>
+    </main>
+
+    <footer>
+      <span id="status">正在检查当前标签页…</span>
+    </footer>
+    <script src="popup.js"></script>
+  </body>
+</html>

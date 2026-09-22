@@ -1,0 +1,68 @@
+{
+  "manifest_version": 3,
+  "name": "刷B站 · 竖滑视频流",
+  "version": "1.0.0",
+  "description": "把 B 站变成可以上下滑的沉浸式竖屏视频流：一个视频一屏，滑一下换一个，右侧点赞/投币/收藏/评论，还原手机刷短视频的手感。",
+  "minimum_chrome_version": "110",
+  "permissions": ["storage", "scripting", "activeTab"],
+  "host_permissions": [
+    "*://*.bilibili.com/*",
+    "*://*.hdslb.com/*"
+  ],
+  "background": {
+    "service_worker": "src/background.js"
+  },
+  "action": {
+    "default_title": "刷B站 · 竖滑视频流",
+    "default_popup": "popup/popup.html",
+    "default_icon": {
+      "16": "icons/icon16.png",
+      "32": "icons/icon32.png",
+      "48": "icons/icon48.png",
+      "128": "icons/icon128.png"
+    }
+  },
+  "icons": {
+    "16": "icons/icon16.png",
+    "32": "icons/icon32.png",
+    "48": "icons/icon48.png",
+    "128": "icons/icon128.png"
+  },
+  "content_scripts": [
+    {
+      "matches": ["*://*.bilibili.com/*"],
+      "js": [
+        "src/core.js",
+        "src/config.js",
+        "src/api.js",
+        "src/feed.js",
+        "src/icons.js",
+        "src/ui/sheets.js",
+        "src/ui/player.js",
+        "src/ui/actionbar.js",
+        "src/ui/comments.js",
+        "src/ui/settings.js",
+        "src/ui/overlay.js",
+        "src/content.js"
+      ],
+      "css": ["src/styles.css"],
+      "run_at": "document_idle",
+      "all_frames": false
+    }
+  ],
+  "web_accessible_resources": [
+    {
+      "resources": ["assets/*", "test/*"],
+      "matches": ["*://*.bilibili.com/*", "*://127.0.0.1/*", "*://localhost/*"]
+    }
+  ],
+  "commands": {
+    "toggle-feed": {
+      "suggested_key": {
+        "default": "Alt+Shift+B",
+        "mac": "Alt+Shift+B"
+      },
+      "description": "打开/关闭竖滑视频流"
+    }
+  }
+}

@@ -1,0 +1,1061 @@
+/* ==========================================================================
+   刷B站 · 竖滑视频流 样式
+   所有类名统一 bbdy- 前缀，配合 Shadow DOM 与外层 host 类名做隔离，
+   不改动、不污染 B 站原页面自身的样式。
+   ========================================================================== */
+
+.bbdy-root {
+  --bbdy-pink: #fb7299;
+  --bbdy-pink-dark: #e05a80;
+  --bbdy-blue: #00aeec;
+  --bbdy-gold: #ffb027;
+  --bbdy-text: #fff;
+  --bbdy-text-dim: rgba(255, 255, 255, 0.72);
+  --bbdy-text-faint: rgba(255, 255, 255, 0.5);
+  --bbdy-panel: #16171a;
+  --bbdy-panel-2: #1f2125;
+  --bbdy-line: rgba(255, 255, 255, 0.1);
+  --bbdy-shadow: 0 4px 18px rgba(0, 0, 0, 0.45);
+  --bbdy-safe-b: env(safe-area-inset-bottom, 0px);
+  position: fixed;
+  inset: 0;
+  z-index: 2147483000;
+  background: #000;
+  color: var(--bbdy-text);
+  font: 14px/1.5 -apple-system, BlinkMacSystemFont, 'PingFang SC', 'Microsoft YaHei', 'Segoe UI', sans-serif;
+  -webkit-font-smoothing: antialiased;
+  overscroll-behavior: contain;
+  touch-action: none;
+  user-select: none;
+}
+.bbdy-root * {
+  box-sizing: border-box;
+}
+.bbdy-root [hidden] {
+  display: none !important;
+}
+
+/* 打开视频流时先藏掉原页面，避免页面自己滚动/抢焦点 */
+html.bbdy-active,
+html.bbdy-active body {
+  overflow: hidden !important;
+  height: 100% !important;
+  touch-action: none;
+}
+html.bbdy-hide-host body > *:not(.bbdy-root-host):not(.bbdy-launcher) {
+  visibility: hidden !important;
+}
+
+/* ============================== 滚动容器 ============================== */
+.bbdy-viewport {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+}
+.bbdy-track {
+  position: absolute;
+  inset: 0;
+  will-change: transform;
+}
+.bbdy-track.bbdy-anim {
+  transition: transform 0.28s cubic-bezier(0.22, 0.61, 0.36, 1);
+}
+.bbdy-page {
+  position: absolute;
+  left: 0;
+  top: 0;
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+  transition: transform 0.28s cubic-bezier(0.22, 0.61, 0.36, 1), opacity 0.28s ease, filter 0.28s ease;
+  transform-origin: center center;
+  background: #000;
+  will-change: transform, opacity;
+}
+.bbdy-page.bbdy-drag {
+  transition: none;
+}
+.bbdy-page.bbdy-adjacent {
+  opacity: 0.6;
+  filter: brightness(0.55);
+}
+.bbdy-page.bbdy-active {
+  opacity: 1;
+  filter: none;
+}
+
+/* 播放器层：竖屏裁切 / 完整显示两种模式 */
+.bbdy-player {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  background: #000;
+}
+.bbdy-frame {
+  position: absolute;
+  border: 0;
+  background: #000;
+  width: 100%;
+  height: 100%;
+  left: 0;
+  top: 0;
+}
+/* 原生 <video> 引擎：object-fit 直接给出抖音式满屏裁切 */
+.bbdy-video {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  background: #000;
+  display: block;
+}
+.bbdy-root[data-screen='portrait'] .bbdy-video {
+  object-fit: cover;
+}
+.bbdy-root[data-screen='fit'] .bbdy-video {
+  object-fit: contain;
+}
+.bbdy-root[data-screen='cover'] .bbdy-video {
+  object-fit: fill;
+}
+.bbdy-root:fullscreen .bbdy-video,
+.bbdy-root:-webkit-full-screen .bbdy-video,
+.bbdy-player.bbdy-fullscreen .bbdy-video {
+  object-fit: contain;
+}
+/* 手势捕获层：吃掉点击/拖拽，避免浏览器的原生 video 控件冒出来 */
+.bbdy-taplock {
+  position: absolute;
+  inset: 0;
+  z-index: 2;
+  background: transparent;
+}
+/* 自绘弹幕 */
+.bbdy-danmaku {
+  position: absolute;
+  inset: 0 0 12% 0;
+  overflow: hidden;
+  pointer-events: none;
+  z-index: 3;
+}
+.bbdy-dm {
+  position: absolute;
+  left: 100%;
+  white-space: nowrap;
+  color: #fff;
+  font-size: 15px;
+  font-weight: 500;
+  text-shadow: 0 0 2px #000, 0 0 4px rgba(0, 0, 0, 0.8);
+  animation-name: bbdy-dm-move;
+  animation-timing-function: linear;
+  animation-fill-mode: forwards;
+  will-change: transform;
+}
+@keyframes bbdy-dm-move {
+  from {
+    transform: translateX(0);
+  }
+  to {
+    transform: translateX(calc(-100vw - 100%));
+  }
+}
+/* 拖动时暂停，画面静止更跟手 */
+.bbdy-root.bbdy-dragging .bbdy-dm {
+  animation-play-state: paused;
+}
+.bbdy-root[data-screen='portrait'] .bbdy-frame {
+  /* 16:9 播放器塞满竖屏：放大裁切，得到抖音那种满屏观感 */
+  width: 178vh;
+  height: 100vh;
+  left: 50%;
+  top: 0;
+  transform: translateX(-50%);
+}
+.bbdy-root[data-screen='cover'] .bbdy-frame {
+  width: 100%;
+  height: 100%;
+}
+.bbdy-root[data-screen='fit'] .bbdy-frame {
+  width: 100%;
+  height: auto;
+  top: 50%;
+  transform: translateY(-50%);
+}
+.bbdy-poster {
+  position: absolute;
+  inset: 0;
+  background-size: cover;
+  background-position: center;
+  filter: blur(18px) brightness(0.5);
+  transform: scale(1.15);
+}
+.bbdy-poster img {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  filter: none;
+}
+.bbdy-shade-top,
+.bbdy-shade-bottom {
+  position: absolute;
+  left: 0;
+  right: 0;
+  pointer-events: none;
+}
+.bbdy-shade-top {
+  top: 0;
+  height: 130px;
+  background: linear-gradient(180deg, rgba(0, 0, 0, 0.62), transparent);
+}
+.bbdy-shade-bottom {
+  bottom: 0;
+  height: 300px;
+  background: linear-gradient(0deg, rgba(0, 0, 0, 0.82), rgba(0, 0, 0, 0.28) 55%, transparent);
+}
+
+/* ============================== 顶栏 ============================== */
+.bbdy-topbar {
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 0;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 12px 14px;
+  z-index: 6;
+}
+.bbdy-tabs {
+  display: flex;
+  gap: 4px;
+  padding: 3px;
+  border-radius: 999px;
+  background: rgba(20, 20, 22, 0.55);
+  backdrop-filter: blur(14px);
+  border: 1px solid var(--bbdy-line);
+}
+.bbdy-tab {
+  appearance: none;
+  border: 0;
+  background: transparent;
+  color: var(--bbdy-text-dim);
+  font-size: 13px;
+  padding: 5px 12px;
+  border-radius: 999px;
+  cursor: pointer;
+  transition: 0.18s;
+  white-space: nowrap;
+}
+.bbdy-tab:hover {
+  color: #fff;
+}
+.bbdy-tab.bbdy-on {
+  background: var(--bbdy-pink);
+  color: #fff;
+  font-weight: 600;
+}
+.bbdy-topbar-spacer {
+  flex: 1;
+}
+.bbdy-iconbtn {
+  appearance: none;
+  border: 1px solid var(--bbdy-line);
+  background: rgba(20, 20, 22, 0.55);
+  backdrop-filter: blur(14px);
+  color: #fff;
+  width: 34px;
+  height: 34px;
+  border-radius: 50%;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: 0.18s;
+  padding: 0;
+}
+.bbdy-iconbtn:hover {
+  background: rgba(255, 255, 255, 0.16);
+}
+.bbdy-iconbtn.bbdy-on {
+  color: var(--bbdy-pink);
+}
+.bbdy-icon {
+  display: inline-flex;
+  width: 1em;
+  height: 1em;
+  font-size: 20px;
+}
+.bbdy-icon svg {
+  width: 100%;
+  height: 100%;
+  display: block;
+}
+.bbdy-me {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 3px 10px 3px 3px;
+  border-radius: 999px;
+  background: rgba(20, 20, 22, 0.55);
+  border: 1px solid var(--bbdy-line);
+  backdrop-filter: blur(14px);
+  font-size: 12px;
+  color: var(--bbdy-text-dim);
+  max-width: 180px;
+}
+.bbdy-me img {
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  object-fit: cover;
+}
+.bbdy-me span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* ============================== 右侧互动栏 ============================== */
+.bbdy-actions {
+  position: absolute;
+  right: 10px;
+  bottom: calc(120px + var(--bbdy-safe-b));
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 16px;
+  z-index: 7;
+}
+.bbdy-action {
+  appearance: none;
+  border: 0;
+  background: transparent;
+  color: #fff;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 3px;
+  cursor: pointer;
+  padding: 0;
+  font: inherit;
+}
+.bbdy-action .bbdy-icon {
+  font-size: 30px;
+  filter: drop-shadow(0 2px 6px rgba(0, 0, 0, 0.6));
+  transition: transform 0.16s ease;
+}
+.bbdy-action:hover .bbdy-icon {
+  transform: scale(1.12);
+}
+.bbdy-action:active .bbdy-icon {
+  transform: scale(0.9);
+}
+.bbdy-action-num {
+  font-size: 12px;
+  font-weight: 600;
+  text-shadow: 0 1px 4px rgba(0, 0, 0, 0.7);
+}
+.bbdy-action.bbdy-on {
+  color: var(--bbdy-pink);
+}
+.bbdy-action.bbdy-on[data-act='coin'] {
+  color: var(--bbdy-gold);
+}
+.bbdy-action.bbdy-on[data-act='fav'] {
+  color: var(--bbdy-gold);
+}
+.bbdy-action[data-act='coin'] .bbdy-icon,
+.bbdy-action[data-act='fav'] .bbdy-icon {
+  font-size: 28px;
+}
+.bbdy-avatar-btn {
+  position: relative;
+  width: 46px;
+  height: 46px;
+  border-radius: 50%;
+  border: 2px solid rgba(255, 255, 255, 0.9);
+  overflow: hidden;
+  background: #333;
+  cursor: pointer;
+  padding: 0;
+  margin-top: 4px;
+}
+.bbdy-avatar-btn img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+.bbdy-avatar-btn .bbdy-followplus {
+  position: absolute;
+  left: 50%;
+  bottom: -9px;
+  transform: translateX(-50%);
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  background: var(--bbdy-pink);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #fff;
+  border: 1px solid #fff;
+}
+.bbdy-avatar-btn .bbdy-followplus .bbdy-icon {
+  font-size: 14px;
+}
+.bbdy-avatar-btn.bbdy-followed .bbdy-followplus {
+  background: #3a3c42;
+  color: #b9bcc4;
+}
+.bbdy-disc {
+  width: 46px;
+  height: 46px;
+  border-radius: 50%;
+  background: #222;
+  border: 1px solid var(--bbdy-line);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  animation: bbdy-spin 6s linear infinite;
+  animation-play-state: paused;
+  overflow: hidden;
+}
+.bbdy-disc.bbdy-playing {
+  animation-play-state: running;
+}
+.bbdy-disc img {
+  width: 60%;
+  height: 60%;
+  object-fit: cover;
+  border-radius: 50%;
+}
+@keyframes bbdy-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+/* ============================== 底部信息区 ============================== */
+.bbdy-info {
+  position: absolute;
+  left: 0;
+  right: 84px;
+  bottom: calc(30px + var(--bbdy-safe-b));
+  padding: 0 14px;
+  z-index: 6;
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+  pointer-events: none;
+}
+.bbdy-info > * {
+  pointer-events: auto;
+}
+.bbdy-up {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 15px;
+  font-weight: 600;
+  color: #fff;
+  text-shadow: 0 1px 4px rgba(0, 0, 0, 0.6);
+}
+.bbdy-upname {
+  cursor: pointer;
+}
+.bbdy-follow {
+  appearance: none;
+  border: 1px solid rgba(255, 255, 255, 0.8);
+  background: transparent;
+  color: #fff;
+  border-radius: 999px;
+  font-size: 12px;
+  padding: 2px 10px;
+  cursor: pointer;
+  transition: 0.18s;
+}
+.bbdy-follow.bbdy-on {
+  border-color: transparent;
+  color: var(--bbdy-text-faint);
+  padding-left: 0;
+}
+.bbdy-title {
+  font-size: 15px;
+  line-height: 1.45;
+  color: #fff;
+  text-shadow: 0 1px 6px rgba(0, 0, 0, 0.7);
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  cursor: pointer;
+  max-width: 100%;
+}
+.bbdy-title.bbdy-open {
+  -webkit-line-clamp: unset;
+}
+.bbdy-tags {
+  display: flex;
+  gap: 6px;
+  overflow-x: auto;
+  scrollbar-width: none;
+  padding-bottom: 2px;
+}
+.bbdy-tags::-webkit-scrollbar {
+  display: none;
+}
+.bbdy-tag {
+  flex: 0 0 auto;
+  font-size: 12px;
+  color: var(--bbdy-text-dim);
+  background: rgba(255, 255, 255, 0.14);
+  border-radius: 999px;
+  padding: 2px 9px;
+  white-space: nowrap;
+  cursor: pointer;
+}
+.bbdy-tag:hover {
+  color: #fff;
+  background: rgba(255, 255, 255, 0.24);
+}
+.bbdy-meta {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 12px;
+  color: var(--bbdy-text-faint);
+}
+.bbdy-meta .bbdy-reason {
+  color: var(--bbdy-pink);
+  max-width: 190px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* ============================== 进度条 ============================== */
+.bbdy-progress {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: 26px;
+  z-index: 8;
+  display: flex;
+  align-items: flex-end;
+  cursor: pointer;
+  padding-bottom: 2px;
+}
+.bbdy-progress-bar {
+  position: relative;
+  width: 100%;
+  height: 3px;
+  background: rgba(255, 255, 255, 0.25);
+  transition: height 0.15s ease;
+}
+.bbdy-progress:hover .bbdy-progress-bar {
+  height: 6px;
+}
+.bbdy-progress-fill {
+  position: absolute;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  width: 0;
+  background: rgba(255, 255, 255, 0.9);
+  border-radius: 0 3px 3px 0;
+}
+.bbdy-progress-fill::after {
+  content: '';
+  position: absolute;
+  right: -6px;
+  top: 50%;
+  width: 12px;
+  height: 12px;
+  margin-top: -6px;
+  border-radius: 50%;
+  background: #fff;
+  box-shadow: 0 0 6px rgba(0, 0, 0, 0.5);
+  opacity: 0;
+  transition: opacity 0.15s;
+}
+.bbdy-progress:hover .bbdy-progress-fill::after {
+  opacity: 1;
+}
+.bbdy-progress-time {
+  position: absolute;
+  right: 12px;
+  bottom: 10px;
+  font-size: 11px;
+  color: var(--bbdy-text-dim);
+  font-variant-numeric: tabular-nums;
+  text-shadow: 0 1px 3px #000;
+}
+
+/* ============================== 中央图层 ============================== */
+.bbdy-center {
+  position: absolute;
+  inset: 0;
+  z-index: 5;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  pointer-events: none;
+}
+.bbdy-big {
+  width: 78px;
+  height: 78px;
+  border-radius: 50%;
+  background: rgba(0, 0, 0, 0.42);
+  backdrop-filter: blur(6px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #fff;
+  opacity: 0;
+  transform: scale(0.7);
+  transition: 0.2s ease;
+}
+.bbdy-big .bbdy-icon {
+  font-size: 38px;
+}
+.bbdy-big.bbdy-show {
+  opacity: 1;
+  transform: scale(1);
+}
+.bbdy-heart {
+  position: absolute;
+  color: var(--bbdy-pink);
+  font-size: 90px;
+  opacity: 0;
+  transform: scale(0.4) rotate(-18deg);
+  pointer-events: none;
+  filter: drop-shadow(0 4px 12px rgba(0, 0, 0, 0.5));
+}
+.bbdy-heart.bbdy-pop {
+  animation: bbdy-heart 0.9s cubic-bezier(0.2, 0.8, 0.2, 1) forwards;
+}
+.bbdy-heart.bbdy-pop2 {
+  animation: bbdy-heart 0.9s cubic-bezier(0.2, 0.8, 0.2, 1) 0.12s forwards;
+  font-size: 64px;
+  margin: -70px 0 0 90px;
+}
+@keyframes bbdy-heart {
+  0% {
+    opacity: 0;
+    transform: scale(0.3) rotate(-18deg);
+  }
+  35% {
+    opacity: 1;
+    transform: scale(1.15) rotate(6deg);
+  }
+  70% {
+    opacity: 1;
+    transform: scale(1) rotate(0);
+  }
+  100% {
+    opacity: 0;
+    transform: scale(1.05) translateY(-40px);
+  }
+}
+.bbdy-spinner {
+  width: 46px;
+  height: 46px;
+  border-radius: 50%;
+  border: 3px solid rgba(255, 255, 255, 0.22);
+  border-top-color: #fff;
+  animation: bbdy-spin 0.8s linear infinite;
+}
+.bbdy-loadwrap {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+  color: var(--bbdy-text-dim);
+  font-size: 13px;
+  text-align: center;
+  max-width: 260px;
+}
+.bbdy-loadwrap .bbdy-retry {
+  pointer-events: auto;
+  appearance: none;
+  border: 1px solid var(--bbdy-line);
+  background: rgba(255, 255, 255, 0.1);
+  color: #fff;
+  border-radius: 999px;
+  padding: 6px 16px;
+  cursor: pointer;
+}
+
+/* 双击 / 长按提示 */
+.bbdy-hint {
+  position: absolute;
+  left: 50%;
+  bottom: calc(96px + var(--bbdy-safe-b));
+  transform: translateX(-50%);
+  background: rgba(0, 0, 0, 0.6);
+  backdrop-filter: blur(10px);
+  border: 1px solid var(--bbdy-line);
+  color: #fff;
+  font-size: 12.5px;
+  padding: 7px 14px;
+  border-radius: 999px;
+  z-index: 9;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  animation: bbdy-fadein 0.25s ease;
+  cursor: pointer;
+  white-space: nowrap;
+}
+.bbdy-hint .bbdy-icon {
+  font-size: 17px;
+  color: var(--bbdy-pink);
+}
+@keyframes bbdy-fadein {
+  from {
+    opacity: 0;
+    transform: translate(-50%, 8px);
+  }
+}
+.bbdy-toast {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  transform: translate(-50%, -50%);
+  background: rgba(0, 0, 0, 0.78);
+  backdrop-filter: blur(10px);
+  border-radius: 12px;
+  padding: 12px 20px;
+  font-size: 14px;
+  z-index: 20;
+  max-width: 70vw;
+  text-align: center;
+  animation: bbdy-fadein 0.2s ease;
+  pointer-events: none;
+}
+.bbdy-toast.bbdy-toast-bottom {
+  top: auto;
+  bottom: calc(150px + var(--bbdy-safe-b));
+  transform: translateX(-50%);
+}
+/* 长按加速的角标 */
+.bbdy-rate {
+  position: absolute;
+  left: 50%;
+  top: 14%;
+  transform: translateX(-50%);
+  background: rgba(0, 0, 0, 0.6);
+  backdrop-filter: blur(8px);
+  border: 1px solid var(--bbdy-line);
+  color: #fff;
+  font-size: 14px;
+  font-weight: 700;
+  padding: 6px 14px;
+  border-radius: 999px;
+  z-index: 9;
+}
+
+/* ============================== 长按菜单 ============================== */
+.bbdy-sheet-mask {
+  position: absolute;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.55);
+  z-index: 30;
+  animation: bbdy-fadein 0.18s ease;
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+}
+.bbdy-sheet {
+  width: 100%;
+  max-width: 460px;
+  background: var(--bbdy-panel);
+  border-radius: 18px 18px 0 0;
+  padding: 8px 0 calc(8px + var(--bbdy-safe-b));
+  animation: bbdy-slideup 0.26s cubic-bezier(0.22, 0.61, 0.36, 1);
+  max-height: 76vh;
+  display: flex;
+  flex-direction: column;
+  border: 1px solid var(--bbdy-line);
+  border-bottom: 0;
+}
+@keyframes bbdy-slideup {
+  from {
+    transform: translateY(24px);
+    opacity: 0.4;
+  }
+}
+.bbdy-sheet-grip {
+  width: 36px;
+  height: 4px;
+  border-radius: 2px;
+  background: rgba(255, 255, 255, 0.22);
+  margin: 6px auto 10px;
+}
+.bbdy-sheet-title {
+  padding: 0 18px 10px;
+  font-size: 14px;
+  color: var(--bbdy-text-dim);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+.bbdy-sheet-body {
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  touch-action: pan-y;
+}
+.bbdy-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 13px 18px;
+  cursor: pointer;
+  font-size: 15px;
+  color: #fff;
+  transition: background 0.15s;
+}
+.bbdy-row:hover {
+  background: var(--bbdy-panel-2);
+}
+.bbdy-row .bbdy-icon {
+  font-size: 20px;
+  color: var(--bbdy-text-dim);
+  flex: 0 0 auto;
+}
+.bbdy-row.bbdy-danger .bbdy-icon,
+.bbdy-row.bbdy-danger {
+  color: #ff6b81;
+}
+.bbdy-row-sub {
+  font-size: 12px;
+  color: var(--bbdy-text-faint);
+  margin-left: auto;
+  text-align: right;
+  max-width: 55%;
+}
+.bbdy-row.bbdy-row-col {
+  flex-direction: column;
+  align-items: stretch;
+  gap: 8px;
+}
+.bbdy-seg {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+.bbdy-seg button {
+  appearance: none;
+  border: 1px solid var(--bbdy-line);
+  background: var(--bbdy-panel-2);
+  color: var(--bbdy-text-dim);
+  border-radius: 999px;
+  padding: 6px 14px;
+  font-size: 13px;
+  cursor: pointer;
+  transition: 0.16s;
+}
+.bbdy-seg button.bbdy-on {
+  background: var(--bbdy-pink);
+  border-color: var(--bbdy-pink);
+  color: #fff;
+  font-weight: 600;
+}
+.bbdy-switch {
+  margin-left: auto;
+  width: 44px;
+  height: 26px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.18);
+  position: relative;
+  transition: 0.2s;
+  flex: 0 0 auto;
+}
+.bbdy-switch::after {
+  content: '';
+  position: absolute;
+  top: 3px;
+  left: 3px;
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  background: #fff;
+  transition: 0.2s;
+}
+.bbdy-row.bbdy-on .bbdy-switch {
+  background: var(--bbdy-pink);
+}
+.bbdy-row.bbdy-on .bbdy-switch::after {
+  left: 21px;
+}
+.bbdy-sheet-hd {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 12px 8px 18px;
+  font-size: 15px;
+  font-weight: 600;
+}
+
+/* ============================== 评论抽屉 ============================== */
+.bbdy-comments {
+  max-height: 66vh;
+}
+.bbdy-comment {
+  display: flex;
+  gap: 10px;
+  padding: 12px 18px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+}
+.bbdy-comment img {
+  width: 34px;
+  height: 34px;
+  border-radius: 50%;
+  object-fit: cover;
+  flex: 0 0 auto;
+  background: #333;
+}
+.bbdy-comment-main {
+  flex: 1;
+  min-width: 0;
+}
+.bbdy-comment-top {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12.5px;
+  color: var(--bbdy-text-faint);
+}
+.bbdy-comment-name {
+  color: #a8c7fa;
+  font-weight: 600;
+  max-width: 140px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.bbdy-lv {
+  background: var(--bbdy-pink);
+  color: #fff;
+  border-radius: 3px;
+  font-size: 10px;
+  padding: 0 3px;
+  line-height: 14px;
+  font-weight: 700;
+}
+.bbdy-comment-msg {
+  font-size: 14.5px;
+  line-height: 1.55;
+  color: #f1f2f4;
+  margin: 4px 0 6px;
+  word-break: break-word;
+  white-space: pre-wrap;
+}
+.bbdy-comment-foot {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  font-size: 12px;
+  color: var(--bbdy-text-faint);
+}
+.bbdy-comment-foot .bbdy-icon {
+  font-size: 15px;
+  vertical-align: -2px;
+}
+.bbdy-comment-sub {
+  background: rgba(255, 255, 255, 0.05);
+  border-radius: 8px;
+  padding: 8px 10px;
+  margin-top: 6px;
+  font-size: 13px;
+  color: var(--bbdy-text-dim);
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.bbdy-comment-sub b {
+  color: #a8c7fa;
+  font-weight: 600;
+}
+.bbdy-loading-row,
+.bbdy-empty {
+  padding: 22px 18px;
+  text-align: center;
+  color: var(--bbdy-text-faint);
+  font-size: 13px;
+}
+
+/* ============================== 悬浮入口 ============================== */
+.bbdy-launcher {
+  position: fixed;
+  right: 18px;
+  bottom: 96px;
+  z-index: 2147482000;
+  width: 50px;
+  height: 50px;
+  border-radius: 50%;
+  border: 2px solid rgba(255, 255, 255, 0.85);
+  background: linear-gradient(160deg, #fb7299, #e05a80);
+  color: #fff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  box-shadow: 0 6px 20px rgba(251, 114, 153, 0.5);
+  transition: transform 0.18s ease, box-shadow 0.18s ease;
+  padding: 0;
+  font: inherit;
+}
+.bbdy-launcher:hover {
+  transform: scale(1.08);
+  box-shadow: 0 8px 26px rgba(251, 114, 153, 0.65);
+}
+.bbdy-launcher .bbdy-icon {
+  font-size: 26px;
+}
+.bbdy-launcher-tip {
+  position: fixed;
+  right: 76px;
+  bottom: 104px;
+  z-index: 2147482000;
+  background: rgba(0, 0, 0, 0.78);
+  color: #fff;
+  font-size: 12px;
+  padding: 5px 10px;
+  border-radius: 8px;
+  white-space: nowrap;
+  pointer-events: none;
+}
+
+/* ============================== 窄屏 / 手机 ============================== */
+@media (max-width: 560px) {
+  .bbdy-actions {
+    gap: 14px;
+    right: 6px;
+    bottom: calc(104px + var(--bbdy-safe-b));
+  }
+  .bbdy-action .bbdy-icon {
+    font-size: 27px;
+  }
+  .bbdy-info {
+    right: 74px;
+  }
+  .bbdy-tabs {
+    max-width: calc(100vw - 130px);
+    overflow-x: auto;
+    scrollbar-width: none;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .bbdy-track.bbdy-anim,
+  .bbdy-page {
+    transition-duration: 0.12s;
+  }
+  .bbdy-disc {
+    animation: none;
+  }
+}
