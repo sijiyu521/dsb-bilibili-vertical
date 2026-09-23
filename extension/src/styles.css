@@ -1046,6 +1046,117 @@ body.dark .bbdy-pill {
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.45);
 }
 
+/* ==================== 视频页菜单（并入原生 / 同款兜底）==================== */
+/* 注入到 B 站「更多」菜单里的那一组：上面一条分隔线，其余继承原生样式 */
+.bbdy-vmenu-native {
+  position: relative;
+  margin-top: 8px;
+  padding-top: 8px;
+}
+.bbdy-vmenu-native::before {
+  content: '';
+  position: absolute;
+  left: 16px;
+  right: 16px;
+  top: 0;
+  height: 1px;
+  background: var(--line_light, #e3e5e7);
+}
+/* 原生菜单项 + 我们的项 共用的微调 */
+.bbdy-vmenu-item {
+  cursor: pointer;
+  font-size: 14px;
+  color: var(--text1, #18191c);
+  display: flex;
+  align-items: center;
+  min-height: 40px;
+  user-select: none;
+}
+.bbdy-vmenu-native .bbdy-vmenu-item {
+  padding: 0 29px;
+}
+.bbdy-vmenu-native .bbdy-vmenu-item:hover {
+  background: rgba(0, 0, 0, 0.04);
+}
+.bbdy-vmenu-text {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.bbdy-vmenu-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  height: 20px;
+  margin-right: 12px;
+  color: var(--graph_icon, #61666d);
+  flex: 0 0 auto;
+}
+.bbdy-vmenu-icon svg {
+  width: 100%;
+  height: 100%;
+}
+.bbdy-vmenu-hint {
+  margin-left: auto;
+  padding-left: 12px;
+  font-size: 12px;
+  color: var(--text3, #9499a0);
+}
+
+/* 兜底：自己弹的同款菜单（参数照抄 B 站 .video-tool-more-popover） */
+.bbdy-vmenu {
+  min-width: 176px;
+  padding: 12px 0;
+  box-sizing: border-box;
+  background: var(--bg1_float, #fff);
+  border: 1px solid var(--line_light, #e3e5e7);
+  box-shadow: 0 0 30px rgba(0, 0, 0, 0.1);
+  border-radius: 8px;
+  z-index: 2147482000;
+  font: 14px/1.5 -apple-system, BlinkMacSystemFont, 'PingFang SC', 'Microsoft YaHei', 'Segoe UI', sans-serif;
+  animation: bbdy-vmenu-in 0.14s ease;
+}
+@keyframes bbdy-vmenu-in {
+  from {
+    opacity: 0;
+    transform: translateY(-4px);
+  }
+}
+.bbdy-vmenu-item {
+  position: relative;
+  padding: 0 20px;
+  color: var(--text1, #18191c);
+}
+.bbdy-vmenu-item:hover,
+.bbdy-vmenu-item:focus-visible {
+  background: rgba(0, 0, 0, 0.04);
+  outline: none;
+}
+/* 深色主题下跟着变（B 站深色会给 html 加 data-dark / .dark） */
+html[data-dark] .bbdy-vmenu,
+html.night-mode .bbdy-vmenu,
+body.dark .bbdy-vmenu {
+  background: #1f2126;
+  border-color: #2f3134;
+  box-shadow: 0 0 30px rgba(0, 0, 0, 0.5);
+}
+html[data-dark] .bbdy-vmenu-item,
+html.night-mode .bbdy-vmenu-item,
+body.dark .bbdy-vmenu-item {
+  color: #e3e5e7;
+}
+html[data-dark] .bbdy-vmenu-item:hover,
+html.night-mode .bbdy-vmenu-item:hover,
+body.dark .bbdy-vmenu-item:hover {
+  background: rgba(255, 255, 255, 0.08);
+}
+html[data-dark] .bbdy-vmenu-native::before,
+html.night-mode .bbdy-vmenu-native::before,
+body.dark .bbdy-vmenu-native::before {
+  background: #2f3134;
+}
+
 /* ============================== 悬浮入口（兜底）============================== */
 .bbdy-launcher {
   position: fixed;

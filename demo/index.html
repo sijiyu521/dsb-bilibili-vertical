@@ -184,8 +184,8 @@
       <code>demo/demo-server.mjs</code> 现造的假数据，用来离线验证滑动手感与交互。
       <br />
       顶栏那颗粉色「竖滑刷」就是插件注入的入口（真站上会排在头像左边）；下面那排模拟视频页的一键三连，
-      那里的入口也可以直接开刷。<code>Alt</code>+<code>Shift</code>+<code>B</code> / <code>\</code> 同样能开，
-      <code>Esc</code> 退出。
+      「更多」那颗点开会看到插件并进去的菜单项（真站上就是视频页⋮菜单）。<code>Alt</code>+<code>Shift</code>+<code>B</code>
+      / <code>\</code> 同样能开，<code>Esc</code> 退出。
     </div>
 
     <div class="fake-toolbar">
@@ -194,6 +194,16 @@
         <span class="video-toolbar-left-item">18.4万</span>
         <span class="video-toolbar-left-item">9.6万</span>
         <span class="video-toolbar-left-item">2.1万</span>
+        <!-- 模拟视频页的「更多」项：真站上它就是插件要并入的那个菜单触发器 -->
+        <span class="video-toolbar-left-item video-tool-more" id="fake-more">更多</span>
+      </div>
+    </div>
+
+    <!-- 模仿 B 站点开「更多」后渲染出来的菜单容器（插件会把入口并进这里） -->
+    <div class="video-tool-more-popover" id="fake-more-popover" hidden>
+      <div class="video-tool-more-dropdown">
+        <div class="dropdown-item">举报</div>
+        <div class="dropdown-item">添加至合集</div>
       </div>
     </div>
 
@@ -212,6 +222,16 @@
           '</div><div class="fake-title">这是一个假的 B 站视频卡片，用来看视频流有没有正确盖住页面</div>';
         grid.append(card);
       }
+
+      // 模拟 B 站的「更多」菜单：点一下才渲染，插件会把入口并进去
+      const moreBtn = document.getElementById('fake-more');
+      const morePop = document.getElementById('fake-more-popover');
+      moreBtn.addEventListener('click', () => {
+        morePop.hidden = !morePop.hidden;
+      });
+      document.addEventListener('click', (e) => {
+        if (!morePop.hidden && !morePop.contains(e.target) && e.target !== moreBtn) morePop.hidden = true;
+      });
     </script>
 
     <!-- 与扩展 manifest 完全相同的加载顺序 -->

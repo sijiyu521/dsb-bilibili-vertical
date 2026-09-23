@@ -30,9 +30,10 @@
   }
 
   /** 界面上任何入口点击后都走这里：记下用户意图 + 带上当前视频 */
-  function openFromUi() {
+  function openFromUi(bvid) {
     BBDY.userInvoked = true;
-    return toggle(true, { seed: BBDY.entry.currentBvid() });
+    const seed = bvid || BBDY.entry.currentBvid();
+    return toggle(true, { seed });
   }
 
   /* ------------------------------ 消息通道 ------------------------------ */

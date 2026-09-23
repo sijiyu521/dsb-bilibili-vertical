@@ -376,6 +376,28 @@
       }
     }
 
+    /** 供视频页菜单调用：只在视频流开着时才执行这些动作 */
+    menuAction(key) {
+      if (!this.visible) {
+        this.toast('先打开竖滑视频流再用这个功能', { bottom: true });
+        return false;
+      }
+      this.onAction(key, this.item);
+      return true;
+    }
+
+    /** 供视频页菜单调用：看评论（视频流没开就先把它开起来） */
+    async commentsFor(bvid) {
+      const target = bvid || BBDY.entry?.currentBvid?.() || '';
+      if (this.visible) {
+        const item = this.item?.bvid === target ? this.item : await BBDY.api.view(target).catch(() => null);
+        if (item) await this.comments.open(item);
+        return true;
+      }
+      await this.show({ seed: target });
+      return this.commentsFor(target);
+    }
+
     /** 供工具栏弹窗调用：打开指定视频的评论（必要时把信息区切到它） */
     async openCommentsFor(item) {
       if (!item) return false;
