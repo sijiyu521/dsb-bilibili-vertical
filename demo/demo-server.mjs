@@ -8,7 +8,7 @@
  *   1. 把 demo/index.html 和 extension/src/* 原样发出去（demo 页面直接复用扩展源码，
  *      保证「演示看到什么，插件里就是什么」）
  *   2. 在 /mock/* 上假装成 api.bilibili.com，返回结构与真实接口一致的假数据
- *      （含 WBI 签名接口、playurl、评论、点赞投币收藏、关注、不感兴趣等）
+ *      （含 WBI 签名接口、playurl、弹幕、评论、点赞投币收藏、关注、不感兴趣等）
  *   3. 自己现搓一个 30 秒的 MP4 当作视频直链，并支持 Range 请求
  *
  * 这样不装扩展、不碰真实 B 站账号，也能把「滑动手感 / 播放 / 弹幕 / 评论 / 三连」跑通。
@@ -16,12 +16,10 @@
 import http from 'node:http';
 import fs from 'node:fs';
 import path from 'node:path';
-import zlib from 'node:zlib';
 import { fileURLToPath } from 'node:url';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const root = path.join(here, '..');
-const srcDir = path.join(root, 'extension', 'src');
 const PORT = Number(process.argv[2] || 8788);
 const DURATION = 30; // 假视频时长（秒）
 const FPS = 2; // 抽帧频率：够小，一帧也能撑满整段时间轴
@@ -60,48 +58,137 @@ const u16 = (n) => {
 };
 const str = (s) => Buffer.from(s, 'ascii');
 
-function buildMoov(sampleCount, sampleSize, timeScale, width, height) {
+function buildMp4(sampleCount, sampleSize, timeScale, width, height) {
   const ftyp = box('ftyp', str('isom'), u32(0x200), str('isomiso2avc1mp41'));
   const mdatPayload = Buffer.alloc(sampleSize * sampleCount);
   for (let i = 0; i < sampleCount; i++) SPS_PPS_IDR.copy(mdatPayload, i * sampleSize);
 
-  const sampleOffsetBase = ftyp.length + 8; // mdat 头之后
+  const sampleOffsetBase = ftyp.length + 8; // mdat 头之后就是第一个样本
   const stbl = box(
     'stbl',
-    box('stsd', u32(0), u32(1), box(
-      'avc1',
-      Buffer.alloc(6),
-      u16(1), // data_reference_index
-      Buffer.alloc(16),
-      u16(width),
-      u16(height),
-      u32(0x00480000), u32(0x00480000), // 72dpi
-      u32(0), u16(1),
-      Buffer.alloc(32),
-      u16(0x0018), // depth
-      u16(0xffff), // -1
-      box('avcC', AVCC)
-    )),
+    box(
+      'stsd',
+      u32(0),
+      u32(1),
+      box(
+        'avc1',
+        Buffer.alloc(6),
+        u16(1), // data_reference_index
+        Buffer.alloc(16),
+        u16(width),
+        u16(height),
+        u32(0x00480000),
+        u32(0x00480000), // 72dpi
+        u32(0),
+        u16(1),
+        Buffer.alloc(32),
+        u16(0x0018), // depth
+        u16(0xffff), // -1
+        box('avcC', AVCC)
+      )
+    ),
     box('stts', u32(0), u32(1), u32(sampleCount), u32(Math.round(timeScale / FPS))),
     box('stsc', u32(0), u32(1), u32(1), u32(sampleCount), u32(1)),
     box('stsz', u32(0), u32(sampleSize), u32(sampleCount)),
     box('stco', u32(0), u32(1), u32(sampleOffsetBase))
   );
-  const minf = box('minf', box('vmhd', u32(0), u16(0), u16(0), u16(0), u16(0)), box('dinf', box('dref', u32(0), u32(1), box('url ', u32(1)))), stbl);
-  const mdia = box('mdia', box('mdhd', u32(0), u32(0), u32(0), u32(timeScale), u32(Math.round((sampleCount / FPS) * timeScale)), u16(0x55c4), u16(0)), box('hdlr', u32(0), u32(0), str('vide'), Buffer.alloc(12), str('VideoHandler\0')), minf);
-  const trak = box('trak', box('tkhd', u32(7), u32(0), u32(0), u32(1), u32(0), u32(Math.round((sampleCount / FPS) * timeScale)), u32(0), u32(0), u16(0), u16(0), u16(0), u16(0), u32(0x00010000), u32(0), u32(0), u32(0), u32(0), u32(0x00010000), u32(0), u32(0), u32(0), u32(0), u32(0x40000000), u32(width << 16), u32(height << 16)), mdia);
-  const mvhd = box('mvhd', u32(0), u32(0), u32(0), u32(timeScale), u32(Math.round((sampleCount / FPS) * timeScale)), u32(0x00010000), u16(0x0100), u16(0), u32(0), u32(0), u32(0x00010000), u32(0), u32(0), u32(0), u32(0), u32(0x00010000), u32(0), u32(0), u32(0), u32(0), u32(0x40000000), u32(0), u32(0), u32(0), u32(0), u32(0), u32(0), u32(0), u32(0), u32(2));
+  const minf = box(
+    'minf',
+    box('vmhd', u32(0), u16(0), u16(0), u16(0), u16(0)),
+    box('dinf', box('dref', u32(0), u32(1), box('url ', u32(1)))),
+    stbl
+  );
+  const mdia = box(
+    'mdia',
+    box(
+      'mdhd',
+      u32(0),
+      u32(0),
+      u32(0),
+      u32(timeScale),
+      u32(Math.round((sampleCount / FPS) * timeScale)),
+      u16(0x55c4),
+      u16(0)
+    ),
+    box('hdlr', u32(0), u32(0), str('vide'), Buffer.alloc(12), str('VideoHandler\0')),
+    minf
+  );
+  const trak = box(
+    'trak',
+    box(
+      'tkhd',
+      u32(7),
+      u32(0),
+      u32(0),
+      u32(1),
+      u32(0),
+      u32(Math.round((sampleCount / FPS) * timeScale)),
+      u32(0),
+      u32(0),
+      u16(0),
+      u16(0),
+      u16(0),
+      u16(0),
+      u32(0x00010000),
+      u32(0),
+      u32(0),
+      u32(0),
+      u32(0),
+      u32(0x00010000),
+      u32(0),
+      u32(0),
+      u32(0),
+      u32(0),
+      u32(0x40000000),
+      u32(width << 16),
+      u32(height << 16)
+    ),
+    mdia
+  );
+  const mvhd = box(
+    'mvhd',
+    u32(0),
+    u32(0),
+    u32(0),
+    u32(timeScale),
+    u32(Math.round((sampleCount / FPS) * timeScale)),
+    u32(0x00010000),
+    u16(0x0100),
+    u16(0),
+    u32(0),
+    u32(0),
+    u32(0x00010000),
+    u32(0),
+    u32(0),
+    u32(0),
+    u32(0),
+    u32(0x00010000),
+    u32(0),
+    u32(0),
+    u32(0),
+    u32(0),
+    u32(0x40000000),
+    u32(0),
+    u32(0),
+    u32(0),
+    u32(0),
+    u32(0),
+    u32(0),
+    u32(0),
+    u32(0),
+    u32(2)
+  );
   const moov = box('moov', mvhd, trak);
   const mdat = box('mdat', mdatPayload);
   return Buffer.concat([ftyp, moov, mdat]);
 }
 
-const MP4 = buildMoov(Math.round(DURATION * FPS), SPS_PPS_IDR.length, 1000, 640, 360);
+const MP4 = buildMp4(Math.round(DURATION * FPS), SPS_PPS_IDR.length, 1000, 640, 360);
 
 /* ===================================================================== *
  * 2. 假封面 / 假头像（BMP 体积小、格式简单）
  * ===================================================================== */
-function bmp(text, hue) {
+function bmp(hue) {
   const W = 640;
   const H = 360;
   const rowSize = Math.ceil((W * 3) / 4) * 4;
@@ -129,7 +216,7 @@ function bmp(text, hue) {
       data[off + 2] = Math.round(r * 255);
     }
   }
-  // 中间画几条白杠，方便肉眼确认画面在动/在裁切
+  // 中间画一条白杠，方便肉眼确认画面有没有在动 / 有没有被裁切
   for (let y = Math.round(H * 0.3); y < Math.round(H * 0.34); y++) {
     for (let x = 0; x < W; x++) {
       const off = (H - 1 - y) * rowSize + x * 3;
@@ -150,13 +237,13 @@ function bmp(text, hue) {
 }
 
 const COVERS = new Map();
-function coverFor(bvid) {
-  if (!COVERS.has(bvid)) {
+function coverFor(name) {
+  if (!COVERS.has(name)) {
     let h = 0;
-    for (const ch of bvid) h = (h * 31 + ch.charCodeAt(0)) % 97;
-    COVERS.set(bvid, bmp(bvid, h / 97));
+    for (const ch of name) h = (h * 31 + ch.charCodeAt(0)) % 97;
+    COVERS.set(name, bmp(h / 97));
   }
-  return COVERS.get(bvid);
+  return COVERS.get(name);
 }
 
 /* ===================================================================== *
@@ -178,26 +265,45 @@ const TITLES = [
   '揭秘：一份外卖从下单到送达的 30 分钟',
   '给爸妈装的智能家居，他们说太香了',
 ];
-const UPS = ['影视飓风', '绵羊料理', '进击的巨人解说', '老滕的院子', '图灵的猫', '阿柴的旅行', '何同学', '影视飓风'];
+const UPS = ['影视飓风', '绵羊料理', '动画区老观众', '老滕的院子', '图灵的猫', '阿柴的旅行', '何同学', '山里的阿伟'];
 const TAGS = ['影视', '美食', '旅行', '数码', '生活', '科技', '纪录片', '手工'];
 const REASONS = ['因为你关注了影视飓风', '与你常看的数码视频相似', '热门推荐', '根据你的观看记录', ''];
+const DANMAKU_TEXTS = [
+  '前方高能',
+  '这一段我看了十遍',
+  '好家伙',
+  '这也太强了吧',
+  '泪目',
+  '滑到这里就别走了',
+  'BGM 是什么',
+  '笑死',
+  '终于更新了',
+  '演示弹幕',
+];
+const COMMENT_NAMES = ['路过的观众', '一只小可爱', '键盘侠本侠', '深夜刷B站', '考古学家'];
+const COMMENT_TEXTS = [
+  '这个演示做得比真 App 还顺，滑动很跟手。',
+  '双击点赞真的有飘心动画，细节拉满。',
+  '评论抽屉能上滑加载更多，好评。',
+  '长按弹出菜单，倍速那里我笑了。',
+  '强烈建议加个「只看这个 UP」，没想到已经有了。',
+];
 
 const BV_CHARS = 'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
 
-/** 生成一个格式合法的假 BV 号：BV1 + 9 位 */
+/** 生成一个格式合法的假 BV 号：BV1 + 9 位，用确定性伪随机打散，看起来更像真的 */
 function mkBvid(i) {
-  let n = i;
+  let s = (i * 2654435761) >>> 0;
   let tail = '';
   for (let k = 0; k < 9; k++) {
-    tail += BV_CHARS[n % BV_CHARS.length];
-    n = Math.floor(n / BV_CHARS.length) + 7;
+    s = (s * 1103515245 + 12345) >>> 0;
+    tail += BV_CHARS[(s >>> 8) % BV_CHARS.length];
   }
   return 'BV1' + tail;
 }
 
 function mkItem(i, src = 'recommend') {
   const bvid = mkBvid(i);
-  const owner = UPS[i % UPS.length];
   return {
     bvid,
     aid: 80000000 + i,
@@ -210,7 +316,11 @@ function mkItem(i, src = 'recommend') {
     pubdate: Math.floor(Date.now() / 1000) - i * 3600,
     tname: TAGS[i % TAGS.length],
     desc: '这是本地演示数据，用来验证滑动、播放、弹幕、评论与互动逻辑。',
-    owner: { mid: 100000 + (i % UPS.length), name: owner, face: `http://127.0.0.1:${PORT}/mock/cover/up${i % UPS.length}.bmp` },
+    owner: {
+      mid: 100000 + (i % UPS.length),
+      name: UPS[i % UPS.length],
+      face: `http://127.0.0.1:${PORT}/mock/cover/up${i % UPS.length}.bmp`,
+    },
     stat: {
       view: 100000 + i * 34567,
       like: 2000 + i * 137,
@@ -232,22 +342,20 @@ function rcmdResponse(n, fresh) {
     code: 0,
     message: '0',
     ttl: 1,
-    data: {
-      item: Array.from({ length: n }, (_, k) => mkItem(fresh * 100 + k, 'recommend')),
-    },
+    data: { item: Array.from({ length: n }, (_, k) => mkItem(fresh * 100 + k, 'recommend')) },
   };
 }
 
-const DANMAKU = (cid) =>
+const danmakuXml = (cid) =>
   `<?xml version="1.0" encoding="UTF-8"?><i><chatserver>chat.bilibili.com</chatserver><chatid>${cid}</chatid>` +
-  Array.from({ length: 120 }, (_, i) => {
-    const text = ['前方高能', '这一段我看了十遍', '好家伙', '这也太强了吧', '泪目', '滑到这里就别走了', 'BGM 是什么', '笑死', '终于更新了', '演示弹幕 ' + i][i % 10];
-    const t = (i * 0.25).toFixed(2);
+  Array.from({ length: 150 }, (_, i) => {
+    const text = DANMAKU_TEXTS[i % DANMAKU_TEXTS.length] + (i > 9 ? ' ' + i : '');
+    const t = (i * 0.2).toFixed(2);
     return `<d p="${t},1,25,16777215,${1700000000 + i},0,demo,${i}">${text}</d>`;
   }).join('') +
   '</i>';
 
-const COMMENTS = (aid) => ({
+const commentsJson = (aid) => ({
   code: 0,
   data: {
     page: { count: 87 },
@@ -260,20 +368,12 @@ const COMMENTS = (aid) => ({
       rcount: i % 3,
       member: {
         mid: 500 + i,
-        uname: ['路过的观众', '一只小可爱', '键盘侠本侠', '深夜刷B站', '考古学家'][i % 5] + i,
+        uname: COMMENT_NAMES[i % COMMENT_NAMES.length] + i,
         face: `http://127.0.0.1:${PORT}/mock/cover/c${i}.bmp`,
         level_info: { current_level: 3 + (i % 3) },
         vip: { vipStatus: 0 },
       },
-      content: {
-        message: [
-          '这个演示做得比真 App 还顺，滑动很跟手。',
-          '双击点赞真的有飘心动画，细节拉满。',
-          '评论抽屉能上滑加载更多，好评。',
-          '长按弹出菜单，倍速那里我笑了。',
-          '强烈建议加个「只看这个 UP」，没想到已经有了。',
-        ][i % 5],
-      },
+      content: { message: COMMENT_TEXTS[i % COMMENT_TEXTS.length] },
       reply_control: { location: 'IP属地：上海' },
       replies:
         i % 3
@@ -308,23 +408,39 @@ const MIME = {
 
 function sendJson(res, obj, status = 200) {
   const body = Buffer.from(JSON.stringify(obj), 'utf8');
-  res.writeHead(status, { 'content-type': MIME['.json'], 'content-length': body.length, 'access-control-allow-origin': '*' });
+  res.writeHead(status, {
+    'content-type': MIME['.json'],
+    'content-length': body.length,
+    'access-control-allow-origin': '*',
+  });
   res.end(body);
 }
 
-const state = { liked: new Set(), coined: new Set(), faved: new Set(), followed: new Set(), hidden: new Set() };
+const state = {
+  liked: new Set(),
+  coined: new Set(),
+  faved: new Set(),
+  followed: new Set(),
+  hidden: new Set(),
+};
 
 function handleMock(req, res, url) {
   const p = url.pathname.replace('/mock', '');
   const q = url.searchParams;
 
+  // 封面 / 头像
   if (p === '/cover' || p.startsWith('/cover/')) {
     const name = decodeURIComponent(p.split('/').pop() || 'x');
     const buf = coverFor(name.replace(/\.bmp$/, ''));
-    res.writeHead(200, { 'content-type': MIME['.bmp'], 'content-length': buf.length, 'cache-control': 'public, max-age=60' });
+    res.writeHead(200, {
+      'content-type': MIME['.bmp'],
+      'content-length': buf.length,
+      'cache-control': 'public, max-age=60',
+    });
     return res.end(buf);
   }
 
+  // 假视频直链：支持 Range，行为跟真实 CDN 一致
   if (p === '/media.mp4') {
     const range = req.headers.range;
     if (range) {
@@ -344,13 +460,14 @@ function handleMock(req, res, url) {
     return res.end(MP4);
   }
 
-  if (p === '/dm/list.so') {
-    const body = Buffer.from(DANMAKU(q.get('oid') || '1'), 'utf8');
+  // 弹幕 XML
+  if (p === '/x/v1/dm/list.so') {
+    const body = Buffer.from(danmakuXml(q.get('oid') || '1'), 'utf8');
     res.writeHead(200, { 'content-type': 'text/xml; charset=utf-8', 'content-length': body.length });
     return res.end(body);
   }
 
-  // —— 接口
+  /* ---------------------------- 内容接口 ---------------------------- */
   if (p === '/x/web-interface/nav') {
     return sendJson(res, {
       code: -101,
@@ -391,7 +508,7 @@ function handleMock(req, res, url) {
     });
   }
   if (p === '/x/space/wbi/arc/search') {
-    const ps = Number(q.get('ps') || 20);
+    const ps = Number(q.get('ps') || 20) || 20;
     return sendJson(res, {
       code: 0,
       data: { list: { vlist: Array.from({ length: ps }, (_, k) => mkItem(3000 + k, 'space')) } },
@@ -402,7 +519,7 @@ function handleMock(req, res, url) {
   }
   if (p === '/x/web-interface/view') {
     const bvid = q.get('bvid') || '';
-    // 从 BV 号反推出尽量稳定的 index，保证同一个视频每次拿到同样的标题/头像
+    // 从 BV 号反推一个尽量稳定的 index，保证同一个视频每次拿到同样的标题/头像
     let idx = 0;
     for (const ch of String(bvid)) idx = (idx * 33 + ch.charCodeAt(0)) % 4999;
     const base = mkItem(idx, 'view');
@@ -414,7 +531,10 @@ function handleMock(req, res, url) {
         cid: base.cid,
         pages: [{ cid: base.cid, page: 1, part: 'P1 演示', duration: DURATION }],
         tag: TAGS.slice(0, 4).map((t) => ({ tag_name: t })),
-        req_user: { like: state.liked.has(bvid) ? 1 : 0, attention: state.followed.has(base.owner.mid) ? 1 : 0 },
+        req_user: {
+          like: state.liked.has(bvid) ? 1 : 0,
+          attention: state.followed.has(String(base.owner.mid)) ? 1 : 0,
+        },
       },
     });
   }
@@ -422,7 +542,7 @@ function handleMock(req, res, url) {
     return sendJson(res, { code: 0, data: TAGS.map((t) => ({ tag_name: t })) });
   }
   if (p === '/x/v2/reply') {
-    return sendJson(res, COMMENTS(Number(q.get('oid') || 1)));
+    return sendJson(res, commentsJson(Number(q.get('oid') || 1)));
   }
   if (p === '/x/player/playurl' || p === '/x/player/wbi/playurl') {
     return sendJson(res, {
@@ -437,7 +557,7 @@ function handleMock(req, res, url) {
     });
   }
 
-  // —— 互动
+  /* ---------------------------- 互动接口 ---------------------------- */
   if (p === '/x/web-interface/archive/like') {
     const bvid = q.get('bvid');
     if (q.get('like') === '1') state.liked.add(bvid);
@@ -458,8 +578,8 @@ function handleMock(req, res, url) {
     return sendJson(res, { code: 0, data: {} });
   }
   if (p === '/x/relation/modify') {
-    if (q.get('act') === '1') state.followed.add(q.get('fid'));
-    else state.followed.delete(q.get('fid'));
+    if (q.get('act') === '1') state.followed.add(String(q.get('fid')));
+    else state.followed.delete(String(q.get('fid')));
     return sendJson(res, { code: 0, data: {} });
   }
   if (p === '/x/feed/dislike') {
@@ -498,8 +618,8 @@ const server = http.createServer((req, res) => {
 });
 
 server.listen(PORT, '127.0.0.1', () => {
-  console.log(`\n  刷B站 · 本地演示已启动`);
-  console.log(`  → 打开 http://127.0.0.1:${PORT}/  （会自动进入竖滑视频流）`);
-  console.log(`  假视频长度 ${DURATION}s，${Math.round(DURATION * FPS)} 帧，MP4 ${(MP4.length / 1024).toFixed(1)} KB`);
-  console.log(`  Ctrl+C 结束\n`);
+  console.log('\n  刷B站 · 本地演示已启动');
+  console.log(`  → 打开 http://127.0.0.1:${PORT}/   （会自动进入竖滑视频流）`);
+  console.log(`  假视频 ${DURATION}s / ${Math.round(DURATION * FPS)} 帧，MP4 ${(MP4.length / 1024).toFixed(1)} KB`);
+  console.log('  Ctrl+C 结束\n');
 });

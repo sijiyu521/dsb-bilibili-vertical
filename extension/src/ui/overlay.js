@@ -296,22 +296,25 @@
     }
 
     /** 把队列里的 item 铺到三个槽位 */
-    _renderAll() {
+    async _renderAll() {
       const cur = this.item;
       if (!cur) return;
       const prev = this.queue.queue[this.queue.cursor - 1] || null;
       const next = this.queue.queue[this.queue.cursor + 1] || null;
+      // 队列首尾时要把空槽清掉，否则会残留上一条的画面
       this._paintSlot(this._slot(-1), prev);
       this._paintSlot(this._slot(0), cur);
       this._paintSlot(this._slot(1), next);
 
+      this._renderInfo(cur);
+      this.actionbar.setItem(cur, this._interactState(cur));
+      this._updateProgress({ time: 0, duration: cur.duration || 0 });
+
+      // 当前页优先播放，相邻页后台预热（不阻塞 UI）
       this._loadInto(this._slot(0), cur, { play: true });
       if (next) this._loadInto(this._slot(1), next, { play: false });
       if (prev) this._loadInto(this._slot(-1), prev, { play: false });
 
-      this._renderInfo(cur);
-      this.actionbar.setItem(cur, this._interactState(cur));
-      this._updateProgress({ time: 0, duration: cur.duration || 0 });
       this.queue.schedulePrefetch();
     }
 
@@ -394,8 +397,12 @@
       this.pending = true;
       await this._animate(dir);
       try {
-        this.queue.current() && this.queue.history.push(this.queue.current());
-        this.queue.cursor++;
+        // 与 FeedQueue.next() 同样的语义，但这里自己控制相邻槽位的刷新
+        const cur = this.queue.current();
+        if (cur) {
+          this.queue.history.push(cur);
+          this.queue.cursor++;
+        }
         const item = await this.queue.ensure(0);
         if (!item) throw new Error('没有更多视频了');
         this.queue.lastBvid = item.bvid;
@@ -421,7 +428,8 @@
       this.pending = true;
       await this._animate(-1);
       try {
-        const item = await this.queue.prev();
+        this.queue.cursor = Math.max(0, this.queue.cursor - 1);
+        const item = await this.queue.ensure(0);
         if (!item) throw new Error('没有上一条了');
         this.item = item;
         this._renderAll();
@@ -972,6 +980,17 @@
           case 'open':
             window.open(`https://www.bilibili.com/video/${item.bvid}`, '_blank', 'noopener');
             break;
+          case 'login': {
+            const state = await BBDY.api.nav(true).catch(() => null);
+            if (state?.isLogin) {
+              this.toast(`当前已登录：${state.uname}`, { bottom: true });
+              const again = await BBDY.api.nav(true).catch(() => null);
+              if (again) this._paintMe(again);
+            } else {
+              BBDY.api.openLogin();
+            }
+            break;
+          }
           case 'uponly':
             await this.showUpOnly(item);
             break;
@@ -1165,23 +1184,33 @@
       return BBDY.sheets.toast(this.root, text, opts);
     }
 
+    /** 顶栏右侧的登录态胶囊 */
+    _paintMe(nav) {
+      if (!nav) return;
+      this.meBox.hidden = false;
+      this.meBox.innerHTML = '';
+      this.meBox.style.cursor = 'pointer';
+      if (nav.isLogin) {
+        if (nav.face) this.meBox.append(el('img', { attrs: { src: nav.face, alt: '' } }));
+        this.meBox.append(el('span', { text: nav.uname + (nav.money ? `（${nav.money} 币）` : '') }));
+        this.meBox.onclick = (e) => {
+          e.stopPropagation();
+          this.openSettings();
+        };
+      } else {
+        this.meBox.append(el('span', { text: '未登录 · 点此登录' }));
+        this.meBox.onclick = (e) => {
+          e.stopPropagation();
+          BBDY.api.openLogin();
+        };
+      }
+    }
+
     async _bootstrapAuth() {
       try {
         const nav = await BBDY.api.nav();
-        if (nav.isLogin) {
-          this.meBox.hidden = false;
-          this.meBox.innerHTML = '';
-          if (nav.face) this.meBox.append(el('img', { attrs: { src: nav.face, alt: '' } }));
-          this.meBox.append(el('span', { text: nav.uname + (nav.money ? `（${nav.money} 币）` : '') }));
-        } else {
-          this.meBox.hidden = false;
-          this.meBox.innerHTML = '';
-          this.meBox.append(el('span', { text: '未登录 · 点此登录' }));
-          this.meBox.style.cursor = 'pointer';
-          this.meBox.onclick = (e) => {
-            e.stopPropagation();
-            BBDY.api.openLogin();
-          };
+        this._paintMe(nav);
+        if (!nav.isLogin) {
           this.toast('未登录也能刷，但推荐会更泛；登录后可点赞投币', { bottom: true, ms: 3200 });
         }
       } catch (e) {

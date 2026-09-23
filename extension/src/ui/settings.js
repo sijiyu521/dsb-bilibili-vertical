@@ -140,6 +140,16 @@
         );
       }
 
+      body.append(el('div', { class: 'bbdy-sheet-hd', text: '账号' }));
+      body.append(
+        BBDY.sheets.row(
+          BBDY.api.isLogin() ? '已登录（点击可重新登录）' : '登录 B 站账号',
+          'follow',
+          () => this.onAction('login', null),
+          { sub: BBDY.api.isLogin() ? '推荐更准 / 可投币收藏 / 清晰度更高' : '登录后可点赞投币收藏、看关注流' }
+        )
+      );
+
       body.append(el('div', { class: 'bbdy-sheet-hd', text: '其他' }));
       body.append(
         BBDY.sheets.row('恢复默认设置', 'refresh', async () => {
