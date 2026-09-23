@@ -35,6 +35,21 @@
 
 > 想改快捷键：`chrome://extensions/shortcuts`
 
+### 找不到扩展图标？（不是没装上）
+
+Chrome 默认会把新装的扩展收进工具栏那排的**拼图图标（🧩 扩展程序菜单）**里，不会自动钉在地址栏旁边。
+点拼图 → 找到「刷B站 · 竖滑视频流」→ 点右边的**钉子图标**固定，之后点图标就会出现菜单（弹窗）。
+
+即使不钉、不点图标也不影响使用：**顶栏那颗「竖滑刷」才是主入口**，另外 <kbd>Alt</kbd>+<kbd>Shift</kbd>+<kbd>B</kbd> 也随时可用。
+
+### 扩展页里显示「Service Worker 不活动」？
+
+**正常现象，不是坏了。** Manifest V3 规定后台 Service Worker 空闲约 30 秒后由浏览器主动停止以省资源。
+本扩展的后台是**无状态**的：内容脚本按 `manifest` 声明直接注入，顶栏入口、快捷键、视频流都不依赖后台常驻；
+点图标、按快捷键、内容脚本通信等任何消息都会**自动把它唤醒**。
+
+真的出问题时（比如点了没反应），在 B 站页面按 <kbd>F12</kbd>，控制台输入 `BBDY.diag()`，会打印一份状态体检表。
+
 ### 用 Release 压缩包安装（不用 clone）
 
 到 [Releases](https://github.com/sijiyu521/dsb-bilibili-vertical/releases) 下载 `extension-v1.1.0.zip`，解压后得到：
