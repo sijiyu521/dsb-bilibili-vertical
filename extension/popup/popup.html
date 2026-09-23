@@ -24,6 +24,31 @@
       </button>
       <p id="hint" class="hint">在 bilibili.com 页面使用；也可以用 <kbd>Alt</kbd>+<kbd>Shift</kbd>+<kbd>B</kbd></p>
 
+      <!-- 互动：作用于「正在播放的视频」，没有视频流时作用于当前视频页 -->
+      <section class="actions" id="actions" hidden>
+        <div class="actions-head">
+          <img id="act-cover" alt="" />
+          <div class="actions-meta">
+            <div id="act-title" class="actions-title">—</div>
+            <div id="act-up" class="actions-up">—</div>
+          </div>
+        </div>
+        <div class="act-grid">
+          <button class="act" data-act="like" title="点赞">
+            <b>赞</b><span data-num="like">—</span>
+          </button>
+          <button class="act" data-act="coin" title="投 2 个币">
+            <b>币</b><span data-num="coin">—</span>
+          </button>
+          <button class="act" data-act="fav" title="收藏到默认收藏夹">
+            <b>藏</b><span data-num="fav">—</span>
+          </button>
+          <button class="act" data-act="comment" title="打开评论">
+            <b>评</b><span data-num="comment">—</span>
+          </button>
+        </div>
+      </section>
+
       <section class="settings">
         <label class="row">
           <span>入口位置</span>

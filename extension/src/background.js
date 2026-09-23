@@ -35,6 +35,12 @@ function isBilibili(url) {
   }
 }
 
+/** 从标签页 URL 里取 BV 号（视频页就是 /video/BVxxx） */
+function extractBvid(url) {
+  const m = String(url || '').match(/\/video\/(BV[0-9A-Za-z]+)/);
+  return m ? m[1] : '';
+}
+
 async function ping(tabId) {
   try {
     return await chrome.tabs.sendMessage(tabId, { type: 'BB_STATE' });
@@ -119,7 +125,28 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
     if (msg.type === 'BB_POPUP_STATE') {
       const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
       const state = tab && tab.id ? await ping(tab.id) : null;
-      sendResponse({ ok: true, state, onBilibili: isBilibili(tab?.url || ''), tabId: tab?.id });
+      // 弹窗要知道对哪个视频做互动：优先用正在播放的那条，否则用标签页 URL 里的 BV 号
+      const bvid = state?.bvid || extractBvid(tab?.url || '') || '';
+      sendResponse({ ok: true, state, bvid, onBilibili: isBilibili(tab?.url || ''), tabId: tab?.id });
+      return;
+    }
+    if (msg.type === 'BB_ACTION') {
+      const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
+      if (!tab || !tab.id || !isBilibili(tab.url || '')) {
+        sendResponse({ ok: false, hint: '请在 B 站页面上使用' });
+        return;
+      }
+      try {
+        await ensureInjected(tab.id);
+        const res = await chrome.tabs.sendMessage(tab.id, {
+          type: 'BB_ACTION',
+          action: msg.action,
+          bvid: msg.bvid,
+        });
+        sendResponse(res || { ok: false, hint: '页面没有响应' });
+      } catch (e) {
+        sendResponse({ ok: false, hint: String(e && e.message ? e.message : e) });
+      }
       return;
     }
     sendResponse({ ok: false, unknown: msg.type });

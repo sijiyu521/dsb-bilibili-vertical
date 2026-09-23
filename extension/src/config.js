@@ -39,6 +39,14 @@
     get settings() {
       return state.settings;
     },
+    /** 会话内的互动状态（弹窗与页面共用，避免两边显示不一致） */
+    getInteract(bvid) {
+      return state.interact[bvid] || {};
+    },
+    setInteract(bvid, patch) {
+      state.interact[bvid] = { ...(state.interact[bvid] || {}), ...patch };
+      return state.interact[bvid];
+    },
     blockedList() {
       return Object.keys(state.blocked);
     },

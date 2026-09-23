@@ -376,6 +376,22 @@
       }
     }
 
+    /** 供工具栏弹窗调用：打开指定视频的评论（必要时把信息区切到它） */
+    async openCommentsFor(item) {
+      if (!item) return false;
+      if (!this.visible) return false;
+      try {
+        await this.queue.detail(item);
+      } catch (_) {}
+      if (this.item?.bvid !== item.bvid) {
+        this.item = item;
+        this._renderInfo(item);
+        this.actionbar.setItem(item, this._interactState(item));
+      }
+      await this.comments.open(item);
+      return true;
+    }
+
     _renderInfo(item) {
       this.upName.textContent = item.owner.name || '未知 UP';
       this.titleEl.textContent = item.title;

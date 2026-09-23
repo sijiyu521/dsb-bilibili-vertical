@@ -87,6 +87,118 @@ body {
   margin: 9px 0 14px;
   text-align: center;
 }
+/* ------------------------------ 互动区 ------------------------------ */
+.actions {
+  border-top: 1px solid var(--line);
+  padding-top: 12px;
+  margin-bottom: 4px;
+}
+.actions-head {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  margin-bottom: 10px;
+}
+.actions-head img {
+  width: 46px;
+  height: 30px;
+  border-radius: 6px;
+  object-fit: cover;
+  background: var(--panel);
+  flex: 0 0 auto;
+}
+.actions-meta {
+  min-width: 0;
+  flex: 1;
+}
+.actions-title {
+  font-size: 12.5px;
+  font-weight: 600;
+  color: var(--text);
+  line-height: 1.35;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+.actions-up {
+  font-size: 11px;
+  color: var(--dim);
+  margin-top: 2px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.act-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 8px;
+}
+.act {
+  appearance: none;
+  border: 1px solid var(--line);
+  background: var(--panel);
+  color: var(--text);
+  border-radius: 10px;
+  padding: 8px 4px 6px;
+  cursor: pointer;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 3px;
+  transition: 0.16s;
+  font: inherit;
+}
+.act:hover {
+  background: #26282d;
+  transform: translateY(-1px);
+}
+.act:active {
+  transform: translateY(0);
+}
+.act:disabled {
+  opacity: 0.5;
+  cursor: default;
+  transform: none;
+}
+.act b {
+  font-size: 15px;
+  font-weight: 700;
+  line-height: 1;
+  color: var(--text);
+}
+.act span {
+  font-size: 10.5px;
+  color: var(--dim);
+  font-variant-numeric: tabular-nums;
+}
+.act.on {
+  border-color: var(--pink);
+  background: rgba(251, 114, 153, 0.16);
+}
+.act.on b {
+  color: var(--pink);
+}
+.act[data-act='coin'].on b,
+.act[data-act='fav'].on b {
+  color: #ffb027;
+}
+.act[data-act='coin'].on,
+.act[data-act='fav'].on {
+  border-color: #ffb027;
+  background: rgba(255, 176, 39, 0.14);
+}
+.act-flash {
+  animation: act-flash 0.5s ease;
+}
+@keyframes act-flash {
+  0% {
+    box-shadow: 0 0 0 0 rgba(251, 114, 153, 0.6);
+  }
+  100% {
+    box-shadow: 0 0 0 12px rgba(251, 114, 153, 0);
+  }
+}
 kbd {
   background: rgba(255, 255, 255, 0.12);
   border-radius: 4px;
