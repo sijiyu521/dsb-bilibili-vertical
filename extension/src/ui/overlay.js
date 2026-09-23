@@ -228,7 +228,7 @@
     /* ==================================================================== *
      * 生命周期
      * ==================================================================== */
-    async show() {
+    async show(opts = {}) {
       if (this.visible) return;
       this.visible = true;
       document.documentElement.classList.add('bbdy-active');
@@ -244,6 +244,9 @@
 
       await this._bootstrapAuth();
 
+      // 从视频页打开时，把当前这个视频插到队首，先播它
+      const seeded = await this._seedFrom(opts.seed);
+
       if (!this.item) {
         this._showLoad('正在挑视频…');
         try {
@@ -253,8 +256,35 @@
           this._showError(e);
           return;
         }
+      } else if (seeded) {
+        this._renderAll();
       } else {
         this.slots.find((s) => s.offset === 0).player.play();
+      }
+    }
+
+    /** 把指定 BV 号（通常是当前正在看的视频）放到队列最前面 */
+    async _seedFrom(bvid) {
+      if (!bvid || !BBDY.config.settings.seedCurrentVideo) return false;
+      if (this.item && this.item.bvid === bvid) return false;
+      this._showLoad('正在打开当前视频…');
+      try {
+        const item = await BBDY.api.view(bvid);
+        if (!item) return false;
+        item.source = 'seed';
+        // 已经刷过/拉黑过就跳过
+        this.queue.queue = this.queue.queue.slice(this.queue.cursor).filter((x) => x.bvid !== bvid);
+        this.queue.cursor = 0;
+        this.queue.queue.unshift(item);
+        this.queue.detailCache.set(bvid, item);
+        this.item = item;
+        BBDY.config.markSeen(bvid);
+        this.queue.schedulePrefetch();
+        BBDY.log('已把当前视频插到队首', bvid);
+        return true;
+      } catch (e) {
+        BBDY.warn('读取当前视频失败，退回普通推荐', e);
+        return false;
       }
     }
 

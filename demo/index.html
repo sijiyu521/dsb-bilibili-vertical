@@ -48,6 +48,60 @@
         display: flex;
         align-items: center;
       }
+      /* 模仿 B 站真实顶栏 / 视频页互动栏的结构，用来验证「嵌进界面」的入口注入 */
+      .fake-header-spacer {
+        flex: 1;
+      }
+      .right-entry__main {
+        display: flex;
+        align-items: center;
+      }
+      .right-entry__item,
+      .right-entry__item-trigger {
+        display: inline-flex;
+        align-items: center;
+        height: 34px;
+        padding: 0 10px;
+        font-size: 13px;
+        color: #61666d;
+        text-decoration: none;
+      }
+      .fake-avatar {
+        width: 36px;
+        height: 36px;
+        border-radius: 50%;
+        background: linear-gradient(135deg, #ffd6e2, #cfe6ff);
+        margin-left: 8px;
+      }
+      .fake-toolbar {
+        max-width: 1180px;
+        margin: 16px auto 0;
+        padding: 0 24px;
+      }
+      .video-toolbar-left-main {
+        display: flex;
+        align-items: center;
+        gap: 20px;
+        background: #fff;
+        border-radius: 8px;
+        padding: 8px 16px;
+        box-shadow: 0 1px 3px rgba(0, 0, 0, 0.06);
+      }
+      .video-toolbar-left-item {
+        display: flex;
+        align-items: center;
+        gap: 6px;
+        font-size: 14px;
+        color: #61666d;
+      }
+      .video-toolbar-left-item::before {
+        content: '';
+        width: 22px;
+        height: 22px;
+        border-radius: 50%;
+        background: #e3e5e7;
+        display: block;
+      }
       .fake-grid {
         max-width: 1180px;
         margin: 18px auto 80px;
@@ -112,17 +166,35 @@
     </style>
   </head>
   <body>
-    <div class="fake-header">
+    <div class="fake-header bili-header__bar">
       <span class="fake-logo">bilibili 演示</span>
       <div class="fake-search">搜索「刷B站」…</div>
+      <div class="fake-header-spacer"></div>
+      <!-- 结构和 B 站真实顶栏一致：注入的「竖滑刷」药丸应该出现在头像左边 -->
+      <div class="right-entry right-entry__main">
+        <a class="right-entry__item right-entry__item-trigger" href="javascript:void(0)">大会员</a>
+        <a class="right-entry__item right-entry__item-trigger" href="javascript:void(0)">消息</a>
+        <a class="right-entry__item right-entry__item-trigger" href="javascript:void(0)">动态</a>
+        <a class="header-avatar-wrap right-entry__item" href="javascript:void(0)"><span class="fake-avatar"></span></a>
+      </div>
     </div>
 
     <div class="fake-note">
       <b>这是本地演示页</b>，不是真的 B 站。页面上所有视频、封面、弹幕、评论都是
       <code>demo/demo-server.mjs</code> 现造的假数据，用来离线验证滑动手感与交互。
       <br />
-      右下角粉色按钮 / <code>Alt</code>+<code>Shift</code>+<code>B</code> / <code>\</code> 打开竖滑视频流；
-      <code>Esc</code> 退出。想看「打开时隐藏原页面」的效果，可以点右下角按钮后再按 <code>Esc</code> 来回对比。
+      顶栏那颗粉色「竖滑刷」就是插件注入的入口（真站上会排在头像左边）；下面那排模拟视频页的一键三连，
+      那里的入口也可以直接开刷。<code>Alt</code>+<code>Shift</code>+<code>B</code> / <code>\</code> 同样能开，
+      <code>Esc</code> 退出。
+    </div>
+
+    <div class="fake-toolbar">
+      <div class="video-toolbar-left-main">
+        <span class="video-toolbar-left-item">292.6万</span>
+        <span class="video-toolbar-left-item">18.4万</span>
+        <span class="video-toolbar-left-item">9.6万</span>
+        <span class="video-toolbar-left-item">2.1万</span>
+      </div>
     </div>
 
     <h2 class="section">首页推荐</h2>
@@ -148,6 +220,7 @@
     <script src="/src/api.js"></script>
     <script src="/src/feed.js"></script>
     <script src="/src/icons.js"></script>
+    <script src="/src/entry.js"></script>
     <script src="/src/ui/sheets.js"></script>
     <script src="/src/ui/player.js"></script>
     <script src="/src/ui/actionbar.js"></script>
@@ -160,9 +233,10 @@
       // 演示环境：自动进入视频流，并打开调试日志
       BBDY.debug = true;
       BBDY.log('demo ready', BBDY.runtime, BBDY.apiBase);
+      // 打开后按 Esc 就能看到顶栏那颗「竖滑刷」入口（顺便验证注入没破坏原页面）
       setTimeout(() => {
-        BBDY.toggleOverlay(true);
-      }, 120);
+        BBDY.openFromUi();
+      }, 150);
     </script>
   </body>
 </html>

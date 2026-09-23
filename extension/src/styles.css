@@ -989,7 +989,64 @@ html.bbdy-hide-host body > *:not(.bbdy-root-host):not(.bbdy-launcher) {
   font-size: 13px;
 }
 
-/* ============================== 悬浮入口 ============================== */
+/* ============================== 原生入口（嵌进 B 站界面）============================== */
+/* 顶栏药丸：和 B 站自己的顶栏入口排在同一行，看起来就是它的一部分 */
+.bbdy-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  height: 34px;
+  padding: 0 12px;
+  margin: 0 6px;
+  border-radius: 17px;
+  background: linear-gradient(135deg, var(--bbdy-pink), var(--bbdy-pink-dark));
+  color: #fff !important;
+  font-size: 13px;
+  font-weight: 600;
+  line-height: 1;
+  text-decoration: none !important;
+  cursor: pointer;
+  user-select: none;
+  white-space: nowrap;
+  vertical-align: middle;
+  box-shadow: 0 2px 8px rgba(251, 114, 153, 0.35);
+  transition: transform 0.16s ease, box-shadow 0.16s ease, filter 0.16s ease;
+}
+.bbdy-pill:hover {
+  transform: translateY(-1px);
+  filter: brightness(1.06);
+  box-shadow: 0 4px 14px rgba(251, 114, 153, 0.5);
+}
+.bbdy-pill:active {
+  transform: translateY(0);
+}
+.bbdy-pill-icon {
+  display: inline-flex;
+  width: 16px;
+  height: 16px;
+}
+.bbdy-pill-icon svg {
+  width: 100%;
+  height: 100%;
+  display: block;
+}
+/* 视频页互动栏里的那颗：和三连按钮同高同基线 */
+.bbdy-pill--toolbar {
+  height: 36px;
+  padding: 0 14px;
+  border-radius: 18px;
+  margin-left: 8px;
+  font-size: 13.5px;
+  align-self: center;
+}
+/* 顶栏深色模式下保证对比度 */
+html[data-dark] .bbdy-pill,
+html.night-mode .bbdy-pill,
+body.dark .bbdy-pill {
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.45);
+}
+
+/* ============================== 悬浮入口（兜底）============================== */
 .bbdy-launcher {
   position: fixed;
   right: 18px;

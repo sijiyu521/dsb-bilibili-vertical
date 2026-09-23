@@ -2,7 +2,8 @@
  * popup.js —— 扩展弹窗：开关视频流 + 几个最常用的设置
  */
 const DEFAULTS = {
-  showLauncher: true,
+  entryMode: 'native',
+  openOnVideoPage: false,
   hideRelated: true,
   muteOnStart: true,
   danmaku: true,

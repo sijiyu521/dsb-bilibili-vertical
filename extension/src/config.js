@@ -15,8 +15,11 @@
     screen: 'portrait', // portrait | fit —— 竖屏裁切 or 完整显示
     pageSize: 12, // 每次拉取条数
     preload: 1, // 预加载后面几条
-    showLauncher: true, // 在 B 站页面右下角显示悬浮入口
+    // 入口位置：native = 嵌进 B 站界面（顶栏药丸 + 视频页互动栏），floating = 右下角悬浮按钮，hidden = 只留快捷键
+    entryMode: 'native',
     hideRelated: true, // 打开视频流时隐藏原页面内容
+    openOnVideoPage: false, // 进入视频页自动开刷（默认关，免得打扰）
+    seedCurrentVideo: true, // 从视频页打开时先播当前这个视频
     seenTtlDays: 1.5, // 去重记忆保留天数
   };
 
@@ -87,6 +90,11 @@
         BBDY.store.get('seen', null),
       ]);
       state.settings = { ...DEFAULTS, ...(settings || {}) };
+      // 旧版本只有 showLauncher 布尔值，平滑迁移到 entryMode
+      if (settings && settings.showLauncher !== undefined && settings.entryMode === undefined) {
+        state.settings.entryMode = settings.showLauncher ? 'native' : 'hidden';
+      }
+      delete state.settings.showLauncher;
       state.blocked = blocked || {};
       // 清理过期去重记录
       const ttl = (state.settings.seenTtlDays || 1.5) * 86400 * 1000;

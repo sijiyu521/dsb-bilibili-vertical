@@ -26,8 +26,16 @@
 
       <section class="settings">
         <label class="row">
-          <span>右下角悬浮入口</span>
-          <input type="checkbox" id="showLauncher" />
+          <span>入口位置</span>
+          <select id="entryMode">
+            <option value="native">嵌进 B 站顶栏</option>
+            <option value="floating">右下角悬浮按钮</option>
+            <option value="hidden">只留快捷键</option>
+          </select>
+        </label>
+        <label class="row">
+          <span>进视频页自动开刷</span>
+          <input type="checkbox" id="openOnVideoPage" />
         </label>
         <label class="row">
           <span>打开时隐藏原页面</span>

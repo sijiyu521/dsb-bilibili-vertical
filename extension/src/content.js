@@ -1,10 +1,8 @@
 /**
  * content.js —— 内容脚本入口
  *
- * 职责：
- *  1. 在 B 站页面右下角放一个粉色悬浮按钮，点开就是全屏竖滑视频流
- *  2. 响应扩展图标 / 快捷键（Alt+Shift+B）的开关消息
- *  3. 支持 ?bbdy=1 或 #bbdy 直接进入（demo 页面与控制台调试用）
+ * 负责：设置引导、开关消息通道、快捷键，以及把「界面入口的注入」交给 entry.js。
+ * 三个入口位置（顶栏药丸 / 视频页互动栏按钮 / 悬浮兜底）都在 entry.js 里维护。
  */
 (function () {
   'use strict';
@@ -15,84 +13,26 @@
   window.__BBDY_CONTENT_LOADED__ = true;
 
   let overlay = null;
-  let launcher = null;
-
   const getOverlay = () => overlay || (overlay = new BBDY.Overlay());
 
-  async function toggle(force) {
+  /**
+   * 开关视频流
+   * @param {boolean} [force] true 打开 / false 关闭 / undefined 切换
+   * @param {{seed?:string}} [opts] seed：要优先播放的 BV 号（从视频页进入时带上当前视频）
+   */
+  async function toggle(force, opts = {}) {
     const o = getOverlay();
     const want = force === undefined ? !o.visible : force;
-    if (want) await o.show();
+    if (want) await o.show(opts);
     else o.hide();
-    paintLauncher();
+    BBDY.entry.paintLauncher();
     return o.visible;
   }
 
-  /* ------------------------------ 悬浮入口 ------------------------------ */
-  function buildLauncher() {
-    const btn = document.createElement('button');
-    btn.className = 'bbdy-launcher';
-    btn.type = 'button';
-    btn.title = '刷B站 · 竖滑视频流（Alt+Shift+B）';
-    btn.innerHTML = `<span class="bbdy-icon">${BBDY.icon('play')}</span>`;
-    btn.addEventListener('click', (e) => {
-      e.preventDefault();
-      e.stopPropagation();
-      toggle(true);
-    });
-    // 拖拽调整位置，避免挡住 B 站自己的悬浮元素
-    let dragging = false;
-    let moved = false;
-    let sy = 0;
-    let sx = 0;
-    let bottom = 96;
-    let right = 18;
-    btn.addEventListener('pointerdown', (e) => {
-      dragging = true;
-      moved = false;
-      sy = e.clientY;
-      sx = e.clientX;
-      btn.setPointerCapture(e.pointerId);
-    });
-    btn.addEventListener('pointermove', (e) => {
-      if (!dragging) return;
-      const dy = sy - e.clientY;
-      const dx = sx - e.clientX;
-      if (!moved && Math.hypot(dx, dy) > 6) moved = true;
-      if (!moved) return;
-      bottom = BBDY.clamp(bottom + dy, 20, window.innerHeight - 80);
-      right = BBDY.clamp(right + dx, 8, window.innerWidth - 70);
-      btn.style.bottom = bottom + 'px';
-      btn.style.right = right + 'px';
-      sy = e.clientY;
-      sx = e.clientX;
-    });
-    btn.addEventListener('pointerup', (e) => {
-      dragging = false;
-      if (!moved) return;
-      e.preventDefault();
-      e.stopPropagation();
-      btn.dataset.moved = '1';
-      setTimeout(() => delete btn.dataset.moved, 300);
-    });
-    btn.addEventListener('click', (e) => {
-      if (btn.dataset.moved) {
-        e.preventDefault();
-        e.stopPropagation();
-      }
-    }, true);
-    return btn;
-  }
-
-  function paintLauncher() {
-    const show = BBDY.config.settings.showLauncher && !(overlay && overlay.visible);
-    if (show && !launcher) {
-      launcher = buildLauncher();
-      document.body.append(launcher);
-    } else if (!show && launcher) {
-      launcher.remove();
-      launcher = null;
-    }
+  /** 界面上任何入口点击后都走这里：记下用户意图 + 带上当前视频 */
+  function openFromUi() {
+    BBDY.userInvoked = true;
+    return toggle(true, { seed: BBDY.entry.currentBvid() });
   }
 
   /* ------------------------------ 消息通道 ------------------------------ */
@@ -100,30 +40,31 @@
     chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
       if (!msg || typeof msg !== 'object') return;
       if (msg.type === 'BB_TOGGLE') {
-        toggle(msg.open).then((visible) => sendResponse({ ok: true, visible }));
+        const force = msg.open === undefined ? undefined : msg.open;
+        toggle(force, { seed: BBDY.entry.currentBvid() }).then((visible) =>
+          sendResponse({ ok: true, visible })
+        );
         return true;
       }
       if (msg.type === 'BB_STATE') {
-        sendResponse({ ok: true, visible: !!(overlay && overlay.visible), version: BBDY.version });
-        return true;
-      }
-      if (msg.type === 'BB_OPEN_VIDEO' && msg.bvid) {
-        toggle(true).then(async (visible) => {
-          const o = getOverlay();
-          if (o.visible) {
-            try {
-              const list = await BBDY.api.spaceArc({ mid: 0, ps: 0 }).catch(() => []);
-              BBDY.log('指定视频播放', msg.bvid);
-            } catch (_) {}
-          }
-          sendResponse({ ok: true, visible });
+        sendResponse({
+          ok: true,
+          visible: !!(overlay && overlay.visible),
+          version: BBDY.version,
+          entry: {
+            nav: !!document.querySelector(`[${BBDY.entry.MARK}="nav"]`),
+            toolbar: !!document.querySelector(`[${BBDY.entry.MARK}="toolbar"]`),
+            floating: !!document.querySelector('.bbdy-launcher'),
+          },
         });
         return true;
       }
+      sendResponse({ ok: false, unknown: msg.type });
+      return false;
     });
   }
 
-  /* --------------------------- 地址栏/快捷键触发 --------------------------- */
+  /* --------------------------- 地址栏 / 快捷键 --------------------------- */
   function wantsAutoOpen() {
     try {
       const q = new URLSearchParams(location.search);
@@ -133,32 +74,37 @@
     }
   }
 
-  let modKey = false;
-  window.addEventListener('keydown', (e) => {
-    if (e.key === 'Shift') modKey = true;
-    // Alt + Shift + B 兜底（扩展快捷键没生效时也能用）
-    if (e.altKey && e.shiftKey && (e.key === 'B' || e.key === 'b')) {
-      e.preventDefault();
-      toggle();
-    }
-    // 单独的 \ 键也可以开
-    if (e.key === '\\' && !e.altKey && !e.ctrlKey && !e.metaKey) {
+  window.addEventListener(
+    'keydown',
+    (e) => {
       const t = e.target;
-      if (t && (t.isContentEditable || /^(INPUT|TEXTAREA)$/.test(t.tagName))) return;
-      e.preventDefault();
-      toggle();
-    }
-  });
+      const typing = t && (t.isContentEditable || /^(INPUT|TEXTAREA|SELECT)$/.test(t.tagName));
+      if (typing) return;
+      // Alt+Shift+B：扩展快捷键没生效时的兜底
+      if (e.altKey && e.shiftKey && (e.key === 'B' || e.key === 'b')) {
+        e.preventDefault();
+        openFromUi();
+        return;
+      }
+      // 反斜杠键
+      if (e.key === '\\' && !e.altKey && !e.ctrlKey && !e.metaKey) {
+        e.preventDefault();
+        openFromUi();
+      }
+    },
+    true
+  );
+
+  /* ------------------------------ 启动 ------------------------------ */
+  BBDY.toggleOverlay = toggle;
+  BBDY.openFromUi = openFromUi;
+  BBDY.getOverlay = getOverlay;
 
   BBDY.config.load().then(() => {
-    paintLauncher();
-    if (wantsAutoOpen()) {
-      setTimeout(() => toggle(true), 300);
-    }
+    BBDY.entry.watch();
+    BBDY.entry.ensure();
+    BBDY.config.on('settings', () => BBDY.entry.ensure());
+    if (wantsAutoOpen()) setTimeout(() => toggle(true, { seed: BBDY.entry.currentBvid() }), 300);
+    BBDY.log('content script ready v' + BBDY.version);
   });
-  BBDY.config.on('settings', () => paintLauncher());
-
-  BBDY.toggleOverlay = toggle;
-  BBDY.getOverlay = getOverlay;
-  BBDY.log('content script ready v' + BBDY.version);
 })();

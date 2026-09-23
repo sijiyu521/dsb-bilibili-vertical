@@ -54,6 +54,30 @@
         })
       );
 
+      body.append(el('div', { class: 'bbdy-sheet-hd', text: '入口' }));
+      body.append(
+        BBDY.sheets.segRow(
+          '入口位置',
+          'window',
+          [
+            { value: 'native', label: '嵌进顶栏' },
+            { value: 'floating', label: '悬浮按钮' },
+            { value: 'hidden', label: '只要快捷键' },
+          ],
+          s.entryMode,
+          (v) => save({ entryMode: v })
+        )
+      );
+      body.append(
+        BBDY.sheets.switchRow('进入视频页自动开刷', 'play', s.openOnVideoPage, (on) => save({ openOnVideoPage: on }))
+      );
+      body.append(
+        BBDY.sheets.switchRow('从视频页打开时先播当前视频', 'history', s.seedCurrentVideo, (on) =>
+          save({ seedCurrentVideo: on })
+        )
+      );
+
+      body.append(el('div', { class: 'bbdy-sheet-hd', text: '播放' }));
       body.append(BBDY.sheets.switchRow('自动连播下一条', 'play', s.autoplay, (on) => save({ autoplay: on })));
       body.append(BBDY.sheets.switchRow('单条循环播放', 'refresh', s.loop, (on) => save({ loop: on })));
       body.append(BBDY.sheets.switchRow('静音启动', 'volumeOff', s.muteOnStart, (on) => save({ muteOnStart: on })));
