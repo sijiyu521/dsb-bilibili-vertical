@@ -154,3 +154,19 @@ footer {
   color: var(--dim);
   text-align: center;
 }
+#status b {
+  font-weight: 600;
+}
+#status b.ok {
+  color: #4ac97e;
+}
+#status b.bad {
+  color: #ff6b81;
+}
+#status b.warn {
+  color: var(--pink);
+}
+#status .sep {
+  opacity: 0.4;
+  margin: 0 2px;
+}

@@ -49,28 +49,53 @@ function flash(text) {
 }
 
 async function refreshState() {
-  const res = await chrome.runtime.sendMessage({ type: 'BB_POPUP_STATE' });
+  // 注意：MV3 的 service worker 空闲 30 秒就会被浏览器停掉（扩展页里显示「不活动」是正常的）。
+  // 这里发消息本身就会把它唤醒，所以只要这个弹窗能显示内容，就说明后台是活的。
+  let res = null;
+  try {
+    res = await chrome.runtime.sendMessage({ type: 'BB_POPUP_STATE' });
+  } catch (e) {
+    res = null;
+  }
   const el = $('#status');
   const label = $('#toggle-label');
   const btn = $('#toggle');
+  const hint = $('#hint');
+
   if (!res || !res.ok) {
-    el.textContent = '无法读取状态';
+    el.textContent = '后台没响应，点一下按钮试试（会自动唤醒）';
+    btn.disabled = true;
+    btn.style.opacity = '0.55';
     return;
   }
+
   if (!res.onBilibili) {
-    el.textContent = '当前不是 B 站页面';
+    el.innerHTML = '当前不是 B 站页面';
     btn.disabled = true;
     btn.style.opacity = '0.55';
     label.textContent = '请先打开 bilibili.com';
-    $('#hint').textContent = '打开任意 B 站页面后回到这里点击即可开启';
+    hint.textContent = '打开任意 B 站页面后回到这里点击即可开启';
     return;
   }
+
   btn.disabled = false;
   btn.style.opacity = '1';
   const open = !!(res.state && res.state.visible);
   label.textContent = open ? '关闭竖滑视频流' : '打开竖滑视频流';
-  el.textContent = open ? '视频流正在运行' : '准备就绪';
   btn.dataset.open = open ? '1' : '0';
+
+  // 把入口状态显示出来：能直接看出顶栏药丸有没有插上
+  const e = (res.state && res.state.entry) || {};
+  const marks = [
+    e.nav ? '<b class="ok">顶栏入口 ✓</b>' : '<b class="bad">顶栏入口 ✗</b>',
+    e.toolbar ? '<b class="ok">视频页入口 ✓</b>' : '<b class="bad">视频页入口 ✗</b>',
+    e.floating ? '<b class="warn">悬浮兜底 ✓</b>' : '',
+  ].filter(Boolean);
+  const ver = (res.state && res.state.version) || '?';
+  el.innerHTML = `v${ver}　${marks.join('　')}`;
+  hint.innerHTML = open
+    ? '视频流正在运行 · <kbd>Esc</kbd> 退出'
+    : '顶栏那颗粉色「竖滑刷」也是入口 · <kbd>Alt</kbd>+<kbd>Shift</kbd>+<kbd>B</kbd>';
 }
 
 $('#toggle').addEventListener('click', async () => {

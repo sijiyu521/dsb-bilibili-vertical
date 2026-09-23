@@ -100,6 +100,45 @@
   BBDY.openFromUi = openFromUi;
   BBDY.getOverlay = getOverlay;
 
+  /* ------------------------------ 自检 ------------------------------ */
+  /**
+   * 在 B 站页面控制台里执行 BBDY.diag()，会打印一份状态体检表。
+   * 排障时先看这个，能直接看出「入口插上了没 / 原页面被藏了没 / 覆盖层还在不在」。
+   */
+  BBDY.diag = function diag() {
+    const pill = (kind) => document.querySelector(`[${BBDY.entry.MARK}="${kind}"]`);
+    const nav = pill('nav');
+    const toolbar = pill('toolbar');
+    const floating = document.querySelector('.bbdy-launcher');
+    const root = document.querySelector('.bbdy-root');
+    const o = getOverlay();
+    const rows = {
+      版本: BBDY.version,
+      运行环境: BBDY.runtime,
+      入口位置设置: BBDY.config.settings.entryMode,
+      顶栏药丸: nav ? (nav.isConnected ? '已插入并在线' : '节点已脱离文档（会被自动重插）') : '未插入',
+      视频页入口: toolbar ? '已插入' : BBDY.entry.isVideoPage() ? '未插入（本页是视频页，应该插上）' : '不适用（非视频页）',
+      悬浮兜底: floating ? '显示中' : '未显示',
+      视频流覆盖层: root ? '在页面上' : '未挂载',
+      覆盖层可视: o.visible ? '是' : '否',
+      播放引擎: o.item ? (o._slot(0)?.player?.engine || '还没开始加载') : '还没有视频',
+      当前视频: o.item ? `${o.item.bvid} ${String(o.item.title).slice(0, 24)}` : '无',
+      'html.bbdy-active': document.documentElement.classList.contains('bbdy-active') ? '有（会隐藏原页面）' : '无',
+      页面骨架: {
+        顶栏入口栏: !!document.querySelector('.right-entry__main, .right-entry'),
+        顶栏头像: !!document.querySelector('.header-avatar-wrap, .header-avatar, .header-avatar-unlogin-entry'),
+        视频互动栏: !!document.querySelector('#arc_toolbar_report, .video-toolbar-left-main'),
+      },
+      快捷键: 'Alt+Shift+B / \\',
+    };
+    try {
+      console.table(rows);
+    } catch (_) {
+      console.log(rows);
+    }
+    return rows;
+  };
+
   BBDY.config.load().then(() => {
     BBDY.entry.watch();
     BBDY.entry.ensure();
