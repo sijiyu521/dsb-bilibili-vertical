@@ -27,6 +27,21 @@
 
 > 想改快捷键：`chrome://extensions/shortcuts`
 
+### 用 Release 压缩包安装（不用 clone）
+
+到 [Releases](https://github.com/sijiyu521/dsb-bilibili-vertical/releases) 下载 `dsb-bilibili-vertical-v1.0.0.zip`，
+解压后得到下面这个结构，然后按上面的步骤选**解压目录里的 `extension/` 文件夹**即可：
+
+```
+dsb-bilibili-vertical-v1.0.0/
+├─ extension/     ← 加载这个（manifest.json 就在里面）
+├─ demo/          ← 离线演示台，可选
+├─ test/  tools/
+└─ README.md  CHANGELOG.md
+```
+
+也可以直接下 `extension-v1.0.0.zip`，它解压出来就是 `extension/` 里的全部内容，选中解压后的文件夹即可。
+
 ---
 
 ## 二、播放原理（为什么手感能做得这么跟手）

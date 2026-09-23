@@ -8,6 +8,7 @@ package-lock.json
 *.log
 dist/
 build/
+release/
 
 # 编辑器与系统
 .vscode/
