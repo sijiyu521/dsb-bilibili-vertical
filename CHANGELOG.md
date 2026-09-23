@@ -25,6 +25,12 @@
 
 - 旧药丸节点在 B 站重建顶栏后会脱离文档，之前会复用这个"僵尸节点"，现在按 `isConnected` 判断并丢弃重插。
 
+### 发布物调整
+
+- Release 里**只放安装包**（`extension-vX.Y.Z.zip`），不再附带源码压缩包；源码始终在仓库，需要下载整份源码时用 GitHub 版本页自带的 **Source code**。
+- 安装包改为「解压出来就是一个可直接加载的文件夹」（`dsb-bilibili-vertical-vX.Y.Z/manifest.json`），不用再往里点一层。
+- `tools/build-release.mjs` 相应简化为只产出一个安装包。
+
 ## [1.0.0] - 2026-09-22
 
 首个可用版本。把 bilibili.com 变成可上下滑的沉浸式竖屏视频流。

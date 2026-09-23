@@ -37,18 +37,16 @@
 
 ### 用 Release 压缩包安装（不用 clone）
 
-到 [Releases](https://github.com/sijiyu521/dsb-bilibili-vertical/releases) 下载 `dsb-bilibili-vertical-v1.0.0.zip`，
-解压后得到下面这个结构，然后按上面的步骤选**解压目录里的 `extension/` 文件夹**即可：
+到 [Releases](https://github.com/sijiyu521/dsb-bilibili-vertical/releases) 下载 `extension-v1.1.0.zip`，解压后得到：
 
 ```
-dsb-bilibili-vertical-v1.0.0/
-├─ extension/     ← 加载这个（manifest.json 就在里面）
-├─ demo/          ← 离线演示台，可选
-├─ test/  tools/
-└─ README.md  CHANGELOG.md
+dsb-bilibili-vertical-v1.1.0/     ← 「加载已解压的扩展程序」时选这个文件夹
+├─ manifest.json
+├─ icons/  popup/  src/
 ```
 
-也可以直接下 `extension-v1.0.0.zip`，它解压出来就是 `extension/` 里的全部内容，选中解压后的文件夹即可。
+解压出来就是一个可以直接加载的文件夹，不用再往里点。Release 里只放安装包，
+源码始终在这个仓库里（需要源码压缩包就用 GitHub 版本页自带的 **Source code**）。
 
 ---
 

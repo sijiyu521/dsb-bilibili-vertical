@@ -1,11 +1,14 @@
 /**
- * build-release.mjs —— 打出可发布的 zip（零依赖，自己写 ZIP）
+ * build-release.mjs —— 打出发布用的扩展安装包（零依赖，自己写 ZIP）
  *
  *   node tools/build-release.mjs
  *
  * 产出：
- *   release/dsb-bilibili-vertical-v1.0.0.zip   整包（extension/ + demo/ + tools/ + 文档）
- *   release/extension-v1.0.0.zip               纯扩展包（解压即可"加载已解压的扩展程序"）
+ *   release/extension-v1.1.0.zip
+ *     解压后是一个同名文件夹，里面直接就是 manifest.json / src/ / icons/ / popup/
+ *     —— 正好是「加载已解压的扩展程序」要选的目录，解压即装。
+ *
+ * 注意：release 里只放安装包，源码留在仓库（GitHub 每个 tag 自带 Source code 压缩包）。
  */
 import fs from 'node:fs';
 import path from 'node:path';
@@ -116,26 +119,22 @@ function walk(dir, base = '') {
 }
 
 const everything = walk(root).filter((f) => f.rel !== 'package-lock.json');
-const zipName = `dsb-bilibili-vertical-v${version}`;
-const fullEntries = everything.map((f) => ({
-  name: `${zipName}/${f.rel}`,
-  data: fs.readFileSync(f.abs),
-}));
+const pkgFolder = `dsb-bilibili-vertical-v${version}`; // 解压后的文件夹名
 
-const extEntries = everything
+const entries = everything
   .filter((f) => f.rel.startsWith('extension/'))
-  .map((f) => ({ name: f.rel.replace(/^extension\//, ''), data: fs.readFileSync(f.abs) }));
+  .map((f) => ({
+    name: `${pkgFolder}/${f.rel.replace(/^extension\//, '')}`,
+    data: fs.readFileSync(f.abs),
+  }));
 
-const fullPath = path.join(outDir, `${zipName}.zip`);
-const extPath = path.join(outDir, `extension-v${version}.zip`);
-fs.writeFileSync(fullPath, makeZip(fullEntries));
-fs.writeFileSync(extPath, makeZip(extEntries));
+const outPath = path.join(outDir, `extension-v${version}.zip`);
+fs.writeFileSync(outPath, makeZip(entries));
 
 console.log(`版本 ${version}`);
-console.log(`  ${path.relative(root, fullPath)}  ${fullEntries.length} 个文件  ${(fs.statSync(fullPath).size / 1024).toFixed(1)} KB`);
-console.log(`  ${path.relative(root, extPath)}  ${extEntries.length} 个文件  ${(fs.statSync(extPath).size / 1024).toFixed(1)} KB`);
-console.log('校验用的 SHA256：');
-for (const p of [fullPath, extPath]) {
-  const h = (await import('node:crypto')).createHash('sha256').update(fs.readFileSync(p)).digest('hex');
-  console.log(`  ${path.basename(p)}  ${h}`);
-}
+console.log(
+  `  ${path.relative(root, outPath)}  ${entries.length} 个文件  ${(fs.statSync(outPath).size / 1024).toFixed(1)} KB`
+);
+console.log(`  解压后目录：${pkgFolder}/  （里面直接是 manifest.json，选中它即可加载）`);
+const h = (await import('node:crypto')).createHash('sha256').update(fs.readFileSync(outPath)).digest('hex');
+console.log(`  SHA256: ${h}`);
