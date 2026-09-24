@@ -623,8 +623,9 @@ html.bbdy-hide-host body > *:not(.bbdy-root-host):not(.bbdy-launcher) {
   min-width: 0;
   height: 30px;
   border-radius: 6px;
-  border: 1px solid rgba(255, 255, 255, 0.24);
-  background: rgba(255, 255, 255, 0.14);
+  /* 之前太透明，浅色画面下输入框和占位文字几乎看不见 —— 改成不透明底 */
+  border: 1px solid rgba(255, 255, 255, 0.28);
+  background: rgba(0, 0, 0, 0.62);
   color: #fff;
   padding: 0 10px;
   font: inherit;
@@ -633,11 +634,15 @@ html.bbdy-hide-host body > *:not(.bbdy-root-host):not(.bbdy-launcher) {
   transition: 0.15s;
 }
 .bbdy-dm-input::placeholder {
-  color: rgba(255, 255, 255, 0.6);
+  color: rgba(255, 255, 255, 0.72);
 }
 .bbdy-dm-input:focus {
   border-color: var(--bbdy-pink);
-  background: rgba(0, 0, 0, 0.45);
+  background: rgba(0, 0, 0, 0.82);
+}
+.bbdy-dm-input:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
 }
 .bbdy-dm-send {
   appearance: none;

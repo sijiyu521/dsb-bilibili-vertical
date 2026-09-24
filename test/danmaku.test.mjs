@@ -248,6 +248,7 @@ await check('底栏状态同步：未登录显示登录按钮，登录后显示�
     ctrlBar: mkEl(),
     dmLoginBtn: mkEl(),
     dmBox: mkEl(),
+    dmInput: mkEl(),
     dmToggleBtn: mkEl(),
     danmakuBtn: mkEl(),
     muteBtn: mkEl(),
@@ -354,6 +355,7 @@ await check('音量：调完不会被重绘弹回，静音/取消静音也保留
     ctrlBar: mkEl(),
     dmLoginBtn: mkEl(),
     dmBox: mkEl(),
+    dmInput: mkEl(),
     dmToggleBtn: mkEl(),
     danmakuBtn: mkEl(),
     muteBtn: mkEl(),
@@ -458,6 +460,7 @@ await check('音量滑杆在 iframe 兜底引擎下会禁用（外面控制不�
     ctrlBar: mkEl(),
     dmLoginBtn: mkEl(),
     dmBox: mkEl(),
+    dmInput: mkEl(),
     dmToggleBtn: mkEl(),
     danmakuBtn: mkEl(),
     muteBtn: mkEl(),
@@ -469,14 +472,22 @@ await check('音量滑杆在 iframe 兜底引擎下会禁用（外面控制不�
     muted: false,
     speed: 1,
     volume: 1,
-    _slot: () => ({ player: { isNative: false } }),
+    _slot: () => ({ player: { isNative: false, engine: 'iframe' } }),
     _paintCtrlBar: B4.Overlay.prototype._paintCtrlBar,
   };
   self._paintCtrlBar.call(self);
   assert.equal(self.volSlider.disabled, true, 'iframe 模式下音量滑杆应禁用');
-  self._slot = () => ({ player: { isNative: true } });
+  assert.equal(self.volBtn.disabled, false, 'iframe 模式下静音按钮仍可用');
+  self._slot = () => ({ player: { isNative: true, engine: 'video' } });
   self._paintCtrlBar.call(self);
   assert.equal(self.volSlider.disabled, false, '原生模式下音量滑杆应可用');
+
+  // 播放器还没起来时，音量与弹幕输入都先禁用（避免"调了没反应"）
+  self._slot = () => ({ player: { isNative: false, engine: null } });
+  self._paintCtrlBar.call(self);
+  assert.equal(self.volSlider.disabled, true, '播放器未就绪时滑杆应禁用');
+  assert.equal(self.volBtn.disabled, true, '播放器未就绪时静音键应禁用');
+  assert.equal(self.dmInput.disabled, true, '播放器未就绪时弹幕输入应禁用');
 });
 
 /* -------------------- 与控制台/输入框的接线（静态） -------------------- */

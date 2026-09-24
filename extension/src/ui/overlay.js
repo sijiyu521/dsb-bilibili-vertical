@@ -336,6 +336,19 @@
       this.danmakuBtn.classList.toggle('bbdy-on', dmOn);
       this.muteBtn.innerHTML = BBDY.icon(this.muted ? 'volumeOff' : 'volume');
       this.volBtn.innerHTML = BBDY.icon(this.muted ? 'volumeOff' : 'volume');
+      // 播放器还没起来（或者根本没拿到视频）时，音量控件先禁用，免得调了没反应
+      const slot = this._slot(0);
+      const player = slot?.player;
+      const ready = !!(player && player.engine);
+      const native = !!(player && player.isNative);
+      this.volBtn.disabled = !ready;
+      this.volSlider.disabled = !ready || !native;
+      this.volBtn.title = !ready
+        ? '视频还在加载…'
+        : native
+        ? '音量（点击静音切换）'
+        : '官方播放器模式下音量由播放器自己控制';
+      this.dmInput.disabled = !ready || !logged;
       // 关键：滑杆显示的是「记住的音量」，静音时显示 0 但不会把记住的值抹掉
       const effective = this.muted ? 0 : this.volume;
       this.volSlider.value = String(Math.round(effective * 100));
@@ -344,10 +357,6 @@
       this.rateBtn.textContent = this.speed && this.speed !== 1 ? this.speed + 'x' : '倍速';
       this.rateBtn.classList.toggle('bbdy-on', !!(this.speed && this.speed !== 1));
       this.fsBtn.classList.toggle('bbdy-on', !!(document.fullscreenElement || document.webkitFullscreenElement));
-      // 官方 iframe 播放器没法从外面控制音量，这时禁用滑杆免得点了没反应
-      const native = !!this._slot(0)?.player?.isNative;
-      this.volSlider.disabled = !native;
-      this.volBtn.title = native ? '音量（点击静音切换）' : '官方播放器模式下音量由播放器自己控制';
     }
 
     /** 设置音量：记住这个值，并同步到当前播放器 */
