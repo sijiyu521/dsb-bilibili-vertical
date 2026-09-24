@@ -23,7 +23,8 @@
     }
 
     _build() {
-      const order = ['like', 'coin', 'fav', 'comment', 'share'];
+      // 顺序对齐手机端：赞 / 币 / 藏 / 分享 / 评论
+      const order = ['like', 'coin', 'fav', 'share', 'comment'];
       for (const key of order) {
         const btn = el('button', {
           class: 'bbdy-action',
@@ -39,10 +40,6 @@
         this.buttons[key] = btn;
         this.root.append(btn);
       }
-
-      // 分享不显示数字，用"分享"文字更接近原版
-      this.buttons.share.querySelector('[data-num]').textContent = '分享';
-      this.buttons.share.querySelector('[data-num]').dataset.static = '1';
 
       // UP 主头像 + 关注
       this.avatar = el('button', {
@@ -136,13 +133,14 @@
       for (const [key, btn] of Object.entries(this.buttons)) {
         if (key === 'like' || key === 'coin' || key === 'fav') btn.classList.toggle('bbdy-on', !!this.state[key]);
         const numEl = btn.querySelector('[data-num]');
-        if (!numEl || numEl.dataset.static) continue;
+        if (!numEl) continue;
         if (key === 'fav' && this.state.fav && !this.counts.fav) numEl.textContent = '已收藏';
         else numEl.textContent = BBDY.num(this.counts[key] || 0);
       }
       this.avatar.classList.toggle('bbdy-followed', !!this.state.followed);
       this.avatar.title = this.state.followed ? '已关注（点击取关）' : '关注';
       this.buttons.comment.title = `评论 (C) · ${BBDY.numFull(this.counts.comment)}`;
+      this.buttons.share.title = `分享 · ${BBDY.numFull(this.counts.share)}`;
     }
 
     setPlaying(playing) {

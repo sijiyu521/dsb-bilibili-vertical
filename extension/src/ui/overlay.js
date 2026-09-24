@@ -153,11 +153,19 @@
       this.infoEl = el('div', { class: 'bbdy-info' }, [this.upRow, this.titleEl, this.tagsEl, this.metaEl]);
       this.root.append(this.infoEl);
 
-      // —— 进度条
+      // —— 底部控制栏（弹幕输入 / 设置 / 自动 / 倍速 / 音量 / 全屏）
+      this._buildCtrlBar();
+      this._onFsChange = () => this._paintCtrlBar();
+      document.addEventListener('fullscreenchange', this._onFsChange);
+      document.addEventListener('webkitfullscreenchange', this._onFsChange);
+
+      // —— 进度条（左边显示 当前时间 / 总时长，和 B 站一致）
       this.progressFill = el('div', { class: 'bbdy-progress-fill' });
-      this.progressTime = el('div', { class: 'bbdy-progress-time', text: '0:00' });
+      this.progressTime = el('div', { class: 'bbdy-progress-time', text: '0:00 / 0:00' });
       this.progressBar = el('div', { class: 'bbdy-progress-bar' }, [this.progressFill]);
-      this.progress = el('div', { class: 'bbdy-progress' }, [this.progressBar, this.progressTime]);
+      this.progress = el('div', { class: 'bbdy-progress' }, [
+        el('div', { class: 'bbdy-progress-row' }, [this.progressTime, this.progressBar]),
+      ]);
       this._bindProgress();
       this.root.append(this.progress);
 
@@ -223,6 +231,174 @@
       });
 
       return { offset, page, poster, posterImg, playerBox, player, item: null, ready: false };
+    }
+
+    /* ------------------------------------------------------------------ *
+     * 底部控制栏（对齐 B 站播放器底栏 + 弹幕输入框）
+     * ------------------------------------------------------------------ */
+    _buildCtrlBar() {
+      const mkBtn = (label, iconName, title, onclick, extraClass) => {
+        const b = el('button', {
+          class: 'bbdy-ctrl-btn' + (extraClass ? ' ' + extraClass : ''),
+          attrs: { type: 'button', title },
+          onclick: (e) => {
+            e.stopPropagation();
+            onclick(b, e);
+          },
+        });
+        b.innerHTML = iconName ? BBDY.icon(iconName) + (label ? `<span>${label}</span>` : '') : `<span>${label}</span>`;
+        return b;
+      };
+
+      // 左：弹幕开关 / 设置
+      this.dmToggleBtn = mkBtn('弹幕', 'danmaku', '弹幕开关', () => this.toggleDanmaku());
+      this.ctrlSettingsBtn = mkBtn('', 'settings', '播放设置', () => this.openSettings());
+      this.ctrlLeft = el('div', { class: 'bbdy-ctrl-group' }, [this.dmToggleBtn, this.ctrlSettingsBtn]);
+
+      // 中：弹幕输入框 + 发送（未登录时显示登录按钮）
+      this.dmInput = el('input', {
+        class: 'bbdy-dm-input',
+        attrs: {
+          type: 'text',
+          maxlength: '100',
+          placeholder: '发个友善的弹幕见证当下',
+          autocomplete: 'off',
+          spellcheck: 'false',
+        },
+      });
+      this.dmInput.addEventListener('keydown', (e) => {
+        e.stopPropagation(); // 别让输入内容触发视频流快捷键
+        if (e.key === 'Enter') this._sendDanmaku();
+      });
+      this.dmInput.addEventListener('keyup', (e) => e.stopPropagation());
+      this.dmInput.addEventListener('pointerdown', (e) => e.stopPropagation());
+      this.dmSendBtn = el('button', {
+        class: 'bbdy-dm-send',
+        attrs: { type: 'button' },
+        text: '发送',
+        onclick: (e) => {
+          e.stopPropagation();
+          this._sendDanmaku();
+        },
+      });
+      this.dmLoginBtn = el('button', {
+        class: 'bbdy-dm-login',
+        attrs: { type: 'button' },
+        text: '请先登录 或 注册',
+        onclick: (e) => {
+          e.stopPropagation();
+          BBDY.api.openLogin();
+        },
+      });
+      this.dmBox = el('div', { class: 'bbdy-dm-box' }, [this.dmInput, this.dmSendBtn]);
+      this.ctrlCenter = el('div', { class: 'bbdy-ctrl-center' }, [this.dmLoginBtn, this.dmBox]);
+
+      // 右：自动 / 倍速 / 音量 / 全屏
+      this.autoBtn = mkBtn('自动', null, '自动连播下一条', () => this.toggleAutoplay(), 'bbdy-ctrl-text');
+      this.rateBtn = mkBtn('倍速', null, '播放速度', () => this.openRateMenu(), 'bbdy-ctrl-text');
+      this.volBtn = mkBtn('', 'volume', '音量（点击静音切换）', () => this.toggleMute());
+      this.volSlider = el('input', {
+        class: 'bbdy-vol-slider',
+        attrs: { type: 'range', min: '0', max: '100', value: '100' },
+      });
+      this.volSlider.addEventListener('input', (e) => {
+        e.stopPropagation();
+        this._setVolume(Number(e.target.value) / 100);
+      });
+      this.volSlider.addEventListener('pointerdown', (e) => e.stopPropagation());
+      this.volWrap = el('div', { class: 'bbdy-vol-wrap' }, [this.volSlider]);
+      this.fsBtn = mkBtn('', 'window', '全屏', () => this.toggleFullscreen());
+      this.ctrlRight = el('div', { class: 'bbdy-ctrl-group bbdy-ctrl-right' }, [
+        this.autoBtn,
+        this.rateBtn,
+        el('div', { class: 'bbdy-vol' }, [this.volBtn, this.volWrap]),
+        this.fsBtn,
+      ]);
+
+      this.ctrlBar = el('div', { class: 'bbdy-ctrlbar' }, [this.ctrlLeft, this.ctrlCenter, this.ctrlRight]);
+      this.ctrlBar.addEventListener('pointerdown', (e) => e.stopPropagation());
+      this.ctrlBar.addEventListener('click', (e) => e.stopPropagation());
+      this.root.append(this.ctrlBar);
+      this._paintCtrlBar();
+    }
+
+    /** 同步底栏上的各种状态（登录态 / 弹幕 / 静音 / 自动连播 / 倍速 / 全屏） */
+    _paintCtrlBar() {
+      if (!this.ctrlBar) return;
+      const logged = BBDY.api.isLogin();
+      this.dmLoginBtn.hidden = logged;
+      this.dmBox.hidden = !logged;
+      const dmOn = !!BBDY.config.settings.danmaku;
+      this.dmToggleBtn.classList.toggle('bbdy-on', dmOn);
+      this.dmToggleBtn.title = dmOn ? '弹幕已开（点击关闭）' : '弹幕已关（点击开启）';
+      this.danmakuBtn.classList.toggle('bbdy-on', dmOn);
+      this.muteBtn.innerHTML = BBDY.icon(this.muted ? 'volumeOff' : 'volume');
+      this.volBtn.innerHTML = BBDY.icon(this.muted ? 'volumeOff' : 'volume');
+      this.volSlider.value = String(Math.round((this.muted ? 0 : 1) * 100));
+      this.autoBtn.textContent = BBDY.config.settings.autoplay ? '自动' : '手动';
+      this.autoBtn.classList.toggle('bbdy-on', !!BBDY.config.settings.autoplay);
+      this.rateBtn.textContent = this.speed && this.speed !== 1 ? this.speed + 'x' : '倍速';
+      this.rateBtn.classList.toggle('bbdy-on', !!(this.speed && this.speed !== 1));
+      this.fsBtn.classList.toggle('bbdy-on', !!(document.fullscreenElement || document.webkitFullscreenElement));
+    }
+
+    _setVolume(vol) {
+      const slot = this._slot(0);
+      if (slot) slot.player.setVolume(vol);
+      this.muted = vol === 0;
+      this._paintCtrlBar();
+    }
+
+    toggleAutoplay() {
+      const on = !BBDY.config.settings.autoplay;
+      BBDY.config.save({ autoplay: on }).then(() => {
+        this._paintCtrlBar();
+        this.toast(on ? '自动连播：开' : '自动连播：关（播完停在当前条）', { bottom: true, ms: 1400 });
+        const slot = this._slot(0);
+        if (slot) slot.player.setLoop(on || BBDY.config.settings.loop);
+      });
+    }
+
+    openRateMenu() {
+      BBDY.speedMenu(this.root, this.item, this.speed, (rate) => this.applySpeed(rate));
+    }
+
+    async toggleFullscreen() {
+      try {
+        await this._slot(0).player.toggleFullscreen();
+      } catch (e) {
+        this.toast('无法全屏：' + (e?.message || e), { bottom: true });
+      }
+      setTimeout(() => this._paintCtrlBar(), 300);
+    }
+
+    /** 发弹幕 */
+    async _sendDanmaku() {
+      const text = (this.dmInput?.value || '').trim();
+      if (!text) {
+        this.toast('先写点内容再发', { bottom: true, ms: 1200 });
+        this.dmInput?.focus();
+        return;
+      }
+      if (!BBDY.api.isLogin()) {
+        this.toast('请先登录 B 站账号', { bottom: true });
+        BBDY.api.openLogin();
+        return;
+      }
+      this.dmSendBtn.disabled = true;
+      this.dmSendBtn.textContent = '发送中';
+      try {
+        const res = await this._slot(0).player.sendDanmaku(text);
+        if (res.ok) {
+          this.dmInput.value = '';
+          this.toast('弹幕已发送', { bottom: true, ms: 1400 });
+        } else {
+          this.toast(res.message || '发送失败', { bottom: true, ms: 2600 });
+        }
+      } finally {
+        this.dmSendBtn.disabled = false;
+        this.dmSendBtn.textContent = '发送';
+      }
     }
 
     /* ==================================================================== *
@@ -940,6 +1116,7 @@
       this.muted = !!BBDY.config.settings.muteOnStart;
       this.muteBtn.innerHTML = BBDY.icon(this.muted ? 'volumeOff' : 'volume');
       this.danmakuBtn.classList.toggle('bbdy-on', !!BBDY.config.settings.danmaku);
+      this._paintCtrlBar();
     }
 
     /* ==================================================================== *

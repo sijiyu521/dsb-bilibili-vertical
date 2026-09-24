@@ -485,7 +485,7 @@
       return { list, total: res.data?.page?.count || 0, code: 0 };
     },
 
-    /** 弹幕列表（可选渲染） */
+    /** 弹幕列表（XML 接口，返回按时间排序的弹幕） */
     async danmaku({ cid }) {
       try {
         const res = await fetch(http.url('/x/v1/dm/list.so?oid=' + encodeURIComponent(cid)), {
@@ -502,12 +502,73 @@
             time: Number(p[0]),
             mode: Number(p[1]),
             color: Number(p[3]),
-            text: m[2].replace(/&amp;/g, '&').replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&quot;/g, '"'),
+            text: m[2]
+              .replace(/&amp;/g, '&')
+              .replace(/&lt;/g, '<')
+              .replace(/&gt;/g, '>')
+              .replace(/&quot;/g, '"'),
           });
         }
         return list;
       } catch {
         return [];
+      }
+    },
+
+    /**
+     * 发弹幕：POST /x/v2/dm/post
+     * 参数来自接口约定：oid=aid、progress=毫秒、mode=1(滚动)、fontsize、color(十进制)。
+     * 需要登录（bili_jct cookie 由 http.post 自动带上）。
+     */
+    async sendDanmaku({ aid, bvid, cid, msg, progressMs = 0, mode = 1, fontSize = 25, color = 16777215 }) {
+      const text = String(msg || '').trim();
+      if (!text) return { ok: false, code: -1, message: '弹幕内容不能为空' };
+      if (text.length > 100) return { ok: false, code: -1, message: '弹幕最多 100 字' };
+      try {
+        const res = await http.post('/x/v2/dm/post', {
+          type: 1,
+          oid: aid,
+          bvid: bvid || '',
+          ...(cid ? { cid } : {}),
+          msg: text,
+          progress: Math.max(0, Math.round(progressMs)),
+          mode,
+          fontsize: fontSize,
+          color,
+          pool: 0,
+          plat: 1,
+          rnd: Math.floor(Date.now() / 1000),
+        });
+        const hint =
+          res.code === 0
+            ? ''
+            : res.code === -101
+            ? '请先登录 B 站账号'
+            : res.code === -400
+            ? '弹幕内容被拒绝（可能是敏感词或格式问题）'
+            : res.code === -403
+            ? '发送被风控拦截，稍后再试'
+            : res.code === 36703
+            ? '弹幕发送太频繁，歇一下'
+            : res.message || String(res.code);
+        return { ok: res.code === 0, code: res.code, message: hint, data: res.data };
+      } catch (e) {
+        return { ok: false, code: -999, message: String(e?.message || e) };
+      }
+    },
+
+    /** 发弹幕前建议先拿一次配置（限制长度、是否允许发送等） */
+    async danmakuConfig({ aid, cid }) {
+      try {
+        const res = await http.post('/x/v2/dm/web/config', { type: 1, oid: aid, pid: cid || 0 });
+        if (res.code !== 0) return null;
+        return {
+          length: res.data?.dm_length ?? 100,
+          closed: !!res.data?.closed,
+          subtitle: res.data?.subtitle || '',
+        };
+      } catch {
+        return null;
       }
     },
 

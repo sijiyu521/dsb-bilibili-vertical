@@ -164,6 +164,14 @@ html.bbdy-hide-host body > *:not(.bbdy-root-host):not(.bbdy-launcher) {
 .bbdy-root.bbdy-dragging .bbdy-dm {
   animation-play-state: paused;
 }
+/* 自己刚发出去的弹幕：加个描边，一眼能认出来 */
+.bbdy-dm.bbdy-dm-mine {
+  font-weight: 700;
+  text-shadow: 0 0 3px #000, 0 0 6px rgba(0, 0, 0, 0.9), 0 0 1px var(--bbdy-pink);
+  border: 1px solid var(--bbdy-pink);
+  border-radius: 4px;
+  padding: 1px 6px;
+}
 .bbdy-root[data-screen='portrait'] .bbdy-frame {
   /* 16:9 播放器塞满竖屏：放大裁切，得到抖音那种满屏观感 */
   width: 178vh;
@@ -320,7 +328,8 @@ html.bbdy-hide-host body > *:not(.bbdy-root-host):not(.bbdy-launcher) {
 .bbdy-actions {
   position: absolute;
   right: 10px;
-  bottom: calc(120px + var(--bbdy-safe-b));
+  /* 让出底部控制栏(42px) + 进度条(34px) + 信息区的位置 */
+  bottom: calc(158px + var(--bbdy-safe-b));
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -442,7 +451,8 @@ html.bbdy-hide-host body > *:not(.bbdy-root-host):not(.bbdy-launcher) {
   position: absolute;
   left: 0;
   right: 84px;
-  bottom: calc(30px + var(--bbdy-safe-b));
+  /* 压在控制栏(42) + 进度条(34) 之上 */
+  bottom: calc(84px + var(--bbdy-safe-b));
   padding: 0 14px;
   z-index: 6;
   display: flex;
@@ -535,25 +545,205 @@ html.bbdy-hide-host body > *:not(.bbdy-root-host):not(.bbdy-launcher) {
   white-space: nowrap;
 }
 
+/* ==================== 底部控制栏（对齐 B 站播放器底栏）==================== */
+.bbdy-ctrlbar {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 34px; /* 给下面的进度条留位置 */
+  height: 42px;
+  z-index: 9;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 0 14px;
+  background: linear-gradient(0deg, rgba(0, 0, 0, 0.62), rgba(0, 0, 0, 0));
+  color: #fff;
+  font-size: 13px;
+}
+.bbdy-ctrl-group {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex: 0 0 auto;
+}
+.bbdy-ctrl-right {
+  margin-left: auto;
+}
+.bbdy-ctrl-btn {
+  appearance: none;
+  border: 0;
+  background: transparent;
+  color: rgba(255, 255, 255, 0.92);
+  height: 30px;
+  padding: 0 6px;
+  border-radius: 6px;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font: inherit;
+  font-size: 13px;
+  transition: 0.15s;
+  white-space: nowrap;
+}
+.bbdy-ctrl-btn:hover {
+  background: rgba(255, 255, 255, 0.14);
+  color: #fff;
+}
+.bbdy-ctrl-btn .bbdy-icon {
+  font-size: 20px;
+}
+.bbdy-ctrl-text {
+  font-weight: 500;
+}
+.bbdy-ctrl-btn.bbdy-on {
+  color: var(--bbdy-pink);
+}
+.bbdy-ctrl-btn.bbdy-on .bbdy-icon {
+  color: var(--bbdy-pink);
+}
+/* 弹幕输入框 */
+.bbdy-ctrl-center {
+  flex: 1 1 auto;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.bbdy-dm-box {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  max-width: 560px;
+}
+.bbdy-dm-input {
+  flex: 1 1 auto;
+  min-width: 0;
+  height: 30px;
+  border-radius: 6px;
+  border: 1px solid rgba(255, 255, 255, 0.24);
+  background: rgba(255, 255, 255, 0.14);
+  color: #fff;
+  padding: 0 10px;
+  font: inherit;
+  font-size: 13px;
+  outline: none;
+  transition: 0.15s;
+}
+.bbdy-dm-input::placeholder {
+  color: rgba(255, 255, 255, 0.6);
+}
+.bbdy-dm-input:focus {
+  border-color: var(--bbdy-pink);
+  background: rgba(0, 0, 0, 0.45);
+}
+.bbdy-dm-send {
+  appearance: none;
+  border: 0;
+  height: 30px;
+  padding: 0 16px;
+  border-radius: 6px;
+  background: var(--bbdy-pink);
+  color: #fff;
+  font: inherit;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: 0.15s;
+  flex: 0 0 auto;
+}
+.bbdy-dm-send:hover {
+  filter: brightness(1.08);
+}
+.bbdy-dm-send:disabled {
+  opacity: 0.65;
+  cursor: default;
+}
+.bbdy-dm-login {
+  appearance: none;
+  border: 1px solid rgba(255, 255, 255, 0.3);
+  background: rgba(255, 255, 255, 0.12);
+  color: #fff;
+  height: 30px;
+  padding: 0 14px;
+  border-radius: 6px;
+  font: inherit;
+  font-size: 13px;
+  cursor: pointer;
+  transition: 0.15s;
+}
+.bbdy-dm-login:hover {
+  background: rgba(255, 255, 255, 0.2);
+}
+/* 音量：hover 才展开滑杆，和 B 站一致 */
+.bbdy-vol {
+  display: flex;
+  align-items: center;
+}
+.bbdy-vol-wrap {
+  width: 0;
+  overflow: hidden;
+  transition: width 0.18s ease;
+  display: flex;
+  align-items: center;
+}
+.bbdy-vol:hover .bbdy-vol-wrap,
+.bbdy-vol-wrap:focus-within {
+  width: 74px;
+}
+.bbdy-vol-slider {
+  appearance: none;
+  width: 70px;
+  height: 3px;
+  margin: 0 0 0 6px;
+  border-radius: 2px;
+  background: rgba(255, 255, 255, 0.35);
+  outline: none;
+  cursor: pointer;
+}
+.bbdy-vol-slider::-webkit-slider-thumb {
+  appearance: none;
+  width: 11px;
+  height: 11px;
+  border-radius: 50%;
+  background: #fff;
+  cursor: pointer;
+}
+.bbdy-vol-slider::-moz-range-thumb {
+  width: 11px;
+  height: 11px;
+  border: 0;
+  border-radius: 50%;
+  background: #fff;
+}
 /* ============================== 进度条 ============================== */
 .bbdy-progress {
   position: absolute;
   left: 0;
   right: 0;
   bottom: 0;
-  height: 26px;
+  height: 34px;
   z-index: 8;
+  cursor: pointer;
   display: flex;
   align-items: flex-end;
-  cursor: pointer;
-  padding-bottom: 2px;
+  padding: 0 14px calc(8px + env(safe-area-inset-bottom, 0px));
+}
+.bbdy-progress-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
 }
 .bbdy-progress-bar {
   position: relative;
-  width: 100%;
+  flex: 1 1 auto;
   height: 3px;
-  background: rgba(255, 255, 255, 0.25);
+  background: rgba(255, 255, 255, 0.28);
   transition: height 0.15s ease;
+  border-radius: 2px;
 }
 .bbdy-progress:hover .bbdy-progress-bar {
   height: 6px;
@@ -564,8 +754,8 @@ html.bbdy-hide-host body > *:not(.bbdy-root-host):not(.bbdy-launcher) {
   top: 0;
   bottom: 0;
   width: 0;
-  background: rgba(255, 255, 255, 0.9);
-  border-radius: 0 3px 3px 0;
+  background: var(--bbdy-pink);
+  border-radius: 3px;
 }
 .bbdy-progress-fill::after {
   content: '';
@@ -585,13 +775,12 @@ html.bbdy-hide-host body > *:not(.bbdy-root-host):not(.bbdy-launcher) {
   opacity: 1;
 }
 .bbdy-progress-time {
-  position: absolute;
-  right: 12px;
-  bottom: 10px;
-  font-size: 11px;
-  color: var(--bbdy-text-dim);
+  flex: 0 0 auto;
+  font-size: 12px;
+  color: #fff;
   font-variant-numeric: tabular-nums;
   text-shadow: 0 1px 3px #000;
+  min-width: 92px;
 }
 
 /* ============================== 中央图层 ============================== */

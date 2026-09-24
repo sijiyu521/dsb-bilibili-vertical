@@ -101,8 +101,9 @@
     spawn(dm) {
       if (this.visible.size > 34) return;
       const node = document.createElement('div');
-      node.className = 'bbdy-dm';
+      node.className = 'bbdy-dm' + (dm.mine ? ' bbdy-dm-mine' : '');
       node.textContent = dm.text;
+      if (dm.color && dm.color !== 16777215) node.style.color = '#' + Number(dm.color).toString(16).padStart(6, '0');
       const top = (Math.floor(Math.random() * this.tracks) * 100) / this.tracks;
       node.style.top = `${top + 2}%`;
       const dur = Math.max(6, 9 * (1 + dm.text.length / 40));
@@ -113,6 +114,12 @@
         node.remove();
         this.visible.delete(node);
       }, dur * 1000 + 200);
+    }
+
+    /** 自己刚发出去的：立刻飘一条 */
+    emit(dm) {
+      if (!this.on) return;
+      this.spawn({ text: dm.text, color: dm.color || 16777215, mine: true });
     }
     destroy() {
       clearInterval(this.timer);
@@ -234,6 +241,74 @@
     setDanmaku(on) {
       if (this.danmaku) this.danmaku.setEnabled(on);
     }
+    /** 只对原生引擎有效：直接设音量（0~1） */
+    setVolume(v) {
+      const vol = BBDY.clamp(Number(v) || 0, 0, 1);
+      this.volume = vol;
+      this.muted = vol === 0;
+      if (this.engine === 'video' && this.video) {
+        this.video.volume = vol;
+        this.video.muted = this.muted;
+      } else {
+        this.post('volume', vol);
+      }
+      this.host.classList.toggle('bbdy-unmuted', !this.muted);
+      return vol;
+    }
+    getVolume() {
+      return this.muted ? 0 : this.volume === undefined ? 1 : this.volume;
+    }
+    /** 当前播放进度（秒） */
+    getCurrentTime() {
+      if (this.engine === 'video' && this.video) return this.video.currentTime || 0;
+      return this.time || 0;
+    }
+
+    /**
+     * 发弹幕：调 B 站接口，成功后立刻在本地飘一条（不用等重新拉列表）
+     */
+    async sendDanmaku(text, { fontsize = 25, color = 16777215, mode = 1 } = {}) {
+      const item = this.item;
+      if (!item) return { ok: false, message: '还没有正在播放的视频' };
+      if (!BBDY.api.isLogin()) return { ok: false, message: '请先登录 B 站账号' };
+      const progressMs = Math.round(this.getCurrentTime() * 1000);
+      const res = await BBDY.api.sendDanmaku({
+        aid: item.aid,
+        bvid: item.bvid,
+        cid: item.cid,
+        msg: text,
+        progressMs,
+        mode,
+        fontSize: fontsize,
+        color,
+      });
+      if (res.ok && this.danmaku && this.danmaku.on) {
+        this.danmaku.emit({ text: String(text).trim(), color, mine: true });
+      }
+      return res;
+    }
+
+    /** 全屏：优先把整个覆盖层全屏（这样底部控制栏也一起全屏） */
+    toggleFullscreen() {
+      const doc = document;
+      const isFs = !!(doc.fullscreenElement || doc.webkitFullscreenElement);
+      if (isFs) {
+        const exit = doc.exitFullscreen || doc.webkitExitFullscreen;
+        try {
+          return Promise.resolve(exit ? exit.call(doc) : null);
+        } catch (e) {
+          return Promise.reject(e);
+        }
+      }
+      const root = this.host.closest('.bbdy-root') || this.host;
+      const target = this.engine === 'video' ? root : this.frame || root;
+      const fn = target.requestFullscreen || target.webkitRequestFullscreen || target.webkitEnterFullscreen;
+      try {
+        return Promise.resolve(fn ? fn.call(target) : null);
+      } catch (e) {
+        return Promise.reject(e);
+      }
+    }
     setQuality(qn) {
       if (this.engine === 'video' && this.item && qn) {
         media.invalidate(this.item.bvid);
@@ -252,14 +327,7 @@
       }
     }
     requestFullscreen() {
-      const target = this.engine === 'video' ? this.video : this.frame;
-      if (!target) return Promise.resolve();
-      const fn = target.requestFullscreen || target.webkitRequestFullscreen || target.webkitEnterFullscreen;
-      try {
-        return Promise.resolve(fn ? fn.call(target) : null);
-      } catch (e) {
-        return Promise.reject(e);
-      }
+      return this.toggleFullscreen();
     }
     get isNative() {
       return this.engine === 'video';
