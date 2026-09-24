@@ -624,6 +624,46 @@
         return [];
       }
     },
+
+    /**
+     * 这个视频当前在哪些收藏夹里（用于决定 deal 的方向）。
+     * 注意：/x/v3/fav/resource/ids 实测无论传 aid 还是 bvid 都返回 -400，不能用；
+     * 这里改用收藏夹内容列表来判断（第一页够用，够不到的返回 null 表示"不知道"）。
+     * @returns {Promise<{folderId:number, title:string, has:boolean}|null>}
+     */
+    async favState({ bvid, folderId }) {
+      if (!bvid) return null;
+      try {
+        let fid = folderId;
+        let title = '';
+        if (!fid) {
+          const nav = await api.nav();
+          const folders = await api.favFolders(nav.mid);
+          if (!folders.length) return null;
+          fid = folders[0].id;
+          title = folders[0].title;
+        }
+        const res = await http.json(
+          '/x/v3/fav/resource/list',
+          { media_id: fid, pn: 1, ps: 40, platform: 'web', order: 'mtime' },
+          { absolute: true }
+        );
+        if (res.code !== 0) return { folderId: fid, title, has: false, unknown: true };
+        const medias = res.data?.medias || [];
+        // 列表里带 bvid 字段；个别情况下只有 id(aid)，两种都比一遍
+        const aid = api.bv2av(bvid);
+        const has = medias.some((m) => m.bvid === bvid || Number(m.id) === aid);
+        return { folderId: fid, title: res.data?.info?.title || title, has };
+      } catch {
+        return null;
+      }
+    },
+
+    /**
+     * 收藏 / 取消收藏。
+     * B 站要求：加收藏走 add_media_ids，取消走 del_media_ids，且**方向必须和实际状态相反**，
+     * 否则请求无效会报错。这里默认按「取反」发送（on 表示目标状态）。
+     */
     async fav({ bvid, on, addIds, delIds }) {
       const res = await http.post('/x/v3/fav/resource/deal', {
         rid: api.bv2av(bvid),
@@ -631,7 +671,27 @@
         add_media_ids: on ? addIds : '',
         del_media_ids: on ? '' : delIds || addIds,
       });
-      return { ok: res.code === 0, code: res.code, message: res.message };
+      const hint =
+        res.code === 0
+          ? ''
+          : res.code === -101
+          ? '请先登录 B 站账号'
+          : res.code === -111
+          ? '收藏夹不存在或已失效'
+          : res.code === 11010
+          ? '该视频已不存在'
+          : res.code === 11011
+          ? '收藏失败：稿件已被删除'
+          : res.code === 11012
+          ? '收藏夹里已经有这个视频了'
+          : res.code === 11013
+          ? '收藏夹里的这个视频已经不存在'
+          : res.code === 11014
+          ? '收藏夹已满'
+          : res.code === -400
+          ? '收藏状态对不上（试试先刷新再点）'
+          : res.message || String(res.code);
+      return { ok: res.code === 0, code: res.code, message: hint };
     },
     async follow({ mid, on }) {
       const res = await http.post('/x/relation/modify', { fid: mid, act: on ? 1 : 2, re_src: 11 });

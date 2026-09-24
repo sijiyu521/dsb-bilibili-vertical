@@ -47,6 +47,58 @@
       state.interact[bvid] = { ...(state.interact[bvid] || {}), ...patch };
       return state.interact[bvid];
     },
+    /**
+     * 收藏 / 取消收藏（**页面与弹窗共用这一份**）。
+     *
+     * 为什么单独抽出来：B 站的收藏是「带方向的」——加走 add_media_ids、取消走 del_media_ids，
+     * 方向必须和收藏夹里的真实状态相反，否则请求无效直接报错。而本地缓存很容易和服务端不一致
+     * （之前在网页端收藏过、换过设备、上次请求失败等）。所以这里**每次先查真实状态**再决定方向，
+     * 万一还是失败，再用相反方向纠正一次。
+     */
+    async toggleFav(item, opts = {}) {
+      if (!item || !item.bvid) return { ok: false, hint: '没有可操作的视频' };
+      if (!BBDY.api.isLogin()) {
+        BBDY.api.openLogin();
+        return { ok: false, hint: '请先登录 B 站账号', needLogin: true };
+      }
+      const bvid = item.bvid;
+      const folders = await BBDY.api.favFolders((await BBDY.api.nav()).mid);
+      if (!folders.length) return { ok: false, hint: '没找到你的收藏夹' };
+      const folder = folders[0];
+
+      // 1) 查真实状态；查不到就退回本地缓存
+      const remote = await BBDY.api.favState({ bvid, folderId: folder.id });
+      const before = remote ? remote.has : !!api.getInteract(bvid).fav;
+
+      // 2) 目标状态默认取反，调用方也可以明确指定
+      const want = opts.want === undefined ? !before : !!opts.want;
+      if (want === before) {
+        api.setInteract(bvid, { fav: before, favFolderId: folder.id });
+        return { ok: true, on: before, hint: before ? '本来就已收藏' : '本来就没收藏', unchanged: true };
+      }
+
+      // 3) 发送；失败且不是未登录时，反方向再试一次（状态判断可能有偏差）
+      const send = (target) => BBDY.api.fav({ bvid, on: target, addIds: folder.id, delIds: folder.id });
+      let r = await send(want);
+      if (!r.ok && r.code !== -101) {
+        const retry = await send(!want);
+        if (retry.ok) {
+          api.setInteract(bvid, { fav: !want, favFolderId: folder.id });
+          BBDY.warn('收藏方向与服务端不一致，已按相反方向纠正');
+          return {
+            ok: true,
+            on: !want,
+            corrected: true,
+            hint: !want ? `已收藏到「${folder.title}」` : '已取消收藏',
+          };
+        }
+        r = retry.code === -101 ? r : retry;
+      }
+
+      if (!r.ok) return { ok: false, hint: r.message || `收藏失败（${r.code}）`, code: r.code };
+      api.setInteract(bvid, { fav: want, favFolderId: folder.id });
+      return { ok: true, on: want, hint: want ? `已收藏到「${folder.title}」` : '已取消收藏' };
+    },
     blockedList() {
       return Object.keys(state.blocked);
     },

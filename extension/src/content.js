@@ -125,16 +125,12 @@
 
         case 'fav': {
           if (needLogin()) return { ok: false, hint: '请先登录 B 站账号' };
-          const nav = await BBDY.api.nav();
-          const folders = await BBDY.api.favFolders(nav.mid);
-          if (!folders.length) return { ok: false, hint: '没找到你的收藏夹' };
-          const folder = folders[0];
-          const on = !saved.fav;
-          const r = await BBDY.api.fav({ bvid, on, addIds: folder.id, delIds: folder.id });
-          if (!r.ok) return { ok: false, hint: `收藏失败：${r.message || r.code}` };
-          const state = snapshot(item, { fav: on });
+          // 收藏是带方向的（加用 add、取消用 del），必须和收藏夹里的真实状态相反；
+          // 统一走 config.toggleFav：它会先查真实状态，失败还会反方向纠正一次
+          const r = await BBDY.config.toggleFav(item);
+          if (!r.ok) return { ok: false, hint: r.hint, needLogin: r.needLogin };
           syncOverlay(item);
-          return { ok: true, hint: on ? `已收藏到「${folder.title}」` : '已取消收藏', state };
+          return { ok: true, hint: r.hint, state: snapshot(item) };
         }
 
         case 'coin': {

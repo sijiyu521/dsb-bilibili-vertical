@@ -243,13 +243,28 @@ const item = {
 };
 
 let loggedIn = true;
+/** 模拟收藏夹里的真实状态（服务端侧） */
+let favHas = false;
+let favStateCalls = 0;
+let favShouldFail = false;
 const stub = {
   isLogin: () => loggedIn,
   view: async () => JSON.parse(JSON.stringify(item)),
   like: async (a) => (calls.push(['like', a]), { ok: true }),
   coin: async (a) => (calls.push(['coin', a]), { ok: true }),
-  fav: async (a) => (calls.push(['fav', a]), { ok: true }),
+  fav: async (a) => {
+    calls.push(['fav', a]);
+    if (favShouldFail) return { ok: false, code: -400, message: '请求错误' };
+    // 模拟服务端语义：方向与当前状态相同时会报错（这正是"收藏错误"的根因）
+    if (a.on === favHas) return { ok: false, code: 11012, message: '收藏夹里已经有这个视频了' };
+    favHas = a.on;
+    return { ok: true, code: 0 };
+  },
   favFolders: async () => (calls.push(['favFolders']), [{ id: 999, title: '默认收藏夹' }]),
+  favState: async () => {
+    favStateCalls++;
+    return { folderId: 999, title: '默认收藏夹', has: favHas };
+  },
   nav: async () => ({ mid: 7, isLogin: true }),
   share: (bvid) => calls.push(['share', bvid]),
   openLogin: () => loginOpens.push(Date.now()),
@@ -294,6 +309,9 @@ function reset() {
   commentOpened = null;
   BBDY.config.state.interact = {};
   loggedIn = true;
+  favHas = false;
+  favStateCalls = 0;
+  favShouldFail = false;
   item.reqUser = { like: false };
   item.stat = { like: 100, coin: 10, fav: 20, reply: 5, view: 1000 };
   overlayStub.visible = true;
@@ -355,20 +373,57 @@ await check('投币：调用 coin(count=2)，重复投币会被拦住', async ()
   assert.match(r2.hint, /已经投过/);
 });
 
-await check('收藏：使用默认收藏夹 id，并且可再次点击取消', async () => {
+await check('收藏：先查真实状态再决定方向，二次点击可取消', async () => {
   reset();
   const r1 = await BBDY.interact('fav', item.bvid);
+  assert.ok(favStateCalls > 0, '应该先查一次收藏夹真实状态');
   const call = calls.find((c) => c[0] === 'fav');
-  assert.equal(call[1].on, true);
+  assert.equal(call[1].on, true, '没收藏过 → 方向应该是「加」');
   assert.equal(call[1].addIds, 999, '应该用默认收藏夹 id');
   assert.match(r1.hint, /默认收藏夹/);
+  assert.equal(favHas, true, '服务端状态应变成已收藏');
 
   calls.length = 0;
   const r2 = await BBDY.interact('fav', item.bvid);
   const call2 = calls.find((c) => c[0] === 'fav');
-  assert.equal(call2[1].on, false);
+  assert.equal(call2[1].on, false, '已收藏 → 方向应该是「取消」');
   assert.equal(call2[1].delIds, 999);
   assert.match(r2.hint, /取消收藏/);
+  assert.equal(favHas, false, '服务端状态应变回未收藏');
+});
+
+await check('收藏：服务端已收藏但本地不知道时，方向依然正确（这是之前的 bug）', async () => {
+  reset();
+  favHas = true; // 用户在网页端收藏过，本地缓存是空的
+  const r = await BBDY.interact('fav', item.bvid);
+  const call = calls.find((c) => c[0] === 'fav');
+  assert.equal(call[1].on, false, '服务端已收藏，点一下必须是「取消」而不是「加」');
+  assert.equal(r.ok, true);
+  assert.match(r.hint, /取消收藏/);
+});
+
+await check('收藏：方向发错时用相反方向自动纠正一次', async () => {
+  reset();
+  // 让 favState 撒谎（说没收藏），但服务端其实已收藏 → 第一次 add 会失败
+  const real = BBDY.api.favState;
+  BBDY.api.favState = async () => ({ folderId: 999, title: '默认收藏夹', has: false });
+  favHas = true;
+  const r = await BBDY.interact('fav', item.bvid);
+  BBDY.api.favState = real;
+  assert.equal(r.ok, true, '应该靠反向重试救回来');
+  const favCalls = calls.filter((c) => c[0] === 'fav');
+  assert.equal(favCalls.length, 2, '应该发两次（第一次失败 + 反向重试）');
+  assert.equal(favCalls[0][1].on, true);
+  assert.equal(favCalls[1][1].on, false, '第二次应反方向');
+  assert.equal(favHas, false, '最终状态应该是取消收藏');
+});
+
+await check('收藏：两次都失败时给出可读的错误', async () => {
+  reset();
+  favShouldFail = true;
+  const r = await BBDY.interact('fav', item.bvid);
+  assert.equal(r.ok, false);
+  assert.ok(r.hint, '应有错误提示');
 });
 
 await check('评论：优先打开覆盖层里的评论抽屉', async () => {

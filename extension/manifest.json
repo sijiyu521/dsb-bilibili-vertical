@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "刷B站 · 竖滑视频流",
-  "version": "1.4.0",
+  "version": "1.4.1",
   "description": "把 B 站变成可以上下滑的沉浸式竖屏视频流：一个视频一屏，滑一下换一个，右侧点赞/投币/收藏/评论，还原手机刷短视频的手感。",
   "minimum_chrome_version": "110",
   "permissions": ["storage", "scripting", "activeTab"],

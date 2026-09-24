@@ -34,6 +34,8 @@
       this.item = null;
       this.pending = false; // 正在翻页动画
       this.muted = true;
+      /** 记住用户调过的音量（0~1）：静音/取消静音、界面重绘时都保留它，不会弹回 0 或 1 */
+      this.volume = 1;
       this.playing = false;
       this.speed = 1;
       this.upOnly = null; // 只看某 UP
@@ -334,18 +336,27 @@
       this.danmakuBtn.classList.toggle('bbdy-on', dmOn);
       this.muteBtn.innerHTML = BBDY.icon(this.muted ? 'volumeOff' : 'volume');
       this.volBtn.innerHTML = BBDY.icon(this.muted ? 'volumeOff' : 'volume');
-      this.volSlider.value = String(Math.round((this.muted ? 0 : 1) * 100));
+      // 关键：滑杆显示的是「记住的音量」，静音时显示 0 但不会把记住的值抹掉
+      const effective = this.muted ? 0 : this.volume;
+      this.volSlider.value = String(Math.round(effective * 100));
       this.autoBtn.textContent = BBDY.config.settings.autoplay ? '自动' : '手动';
       this.autoBtn.classList.toggle('bbdy-on', !!BBDY.config.settings.autoplay);
       this.rateBtn.textContent = this.speed && this.speed !== 1 ? this.speed + 'x' : '倍速';
       this.rateBtn.classList.toggle('bbdy-on', !!(this.speed && this.speed !== 1));
       this.fsBtn.classList.toggle('bbdy-on', !!(document.fullscreenElement || document.webkitFullscreenElement));
+      // 官方 iframe 播放器没法从外面控制音量，这时禁用滑杆免得点了没反应
+      const native = !!this._slot(0)?.player?.isNative;
+      this.volSlider.disabled = !native;
+      this.volBtn.title = native ? '音量（点击静音切换）' : '官方播放器模式下音量由播放器自己控制';
     }
 
+    /** 设置音量：记住这个值，并同步到当前播放器 */
     _setVolume(vol) {
+      const v = BBDY.clamp(Number(vol) || 0, 0, 1);
+      this.volume = v > 0 ? v : this.volume || 1; // 拖到 0 时保留上次的非零值，方便拖回来
       const slot = this._slot(0);
-      if (slot) slot.player.setVolume(vol);
-      this.muted = vol === 0;
+      if (slot) slot.player.setVolume(v);
+      this.muted = v === 0;
       this._paintCtrlBar();
     }
 
@@ -1029,9 +1040,18 @@
       this.muted = !!muted;
       this.muteBtn.innerHTML = BBDY.icon(this.muted ? 'volumeOff' : 'volume');
       const slot = this._slot(0);
-      if (slot) slot.player.setMuted(this.muted);
+      if (slot) {
+        if (slot.player.isNative) {
+          // 原生引擎：真实调音量；取消静音时恢复用户之前调过的值，而不是直接拉满
+          slot.player.setVolume(this.muted ? 0 : this.volume || 1);
+        } else {
+          // iframe 兜底引擎：只能发静音/取消静音指令，音量本身由官方播放器控制
+          slot.player.setMuted(this.muted);
+        }
+      }
+      this._paintCtrlBar();
       if (!this.muted) {
-        this.toast('已开启声音', { bottom: true, ms: 1100 });
+        this.toast(`已开启声音（${Math.round((this.volume || 1) * 100)}%）`, { bottom: true, ms: 1100 });
         this._hideHint();
       } else if (!silent) {
         this.toast('已静音', { bottom: true, ms: 1100 });
@@ -1173,25 +1193,16 @@
           }
           case 'fav': {
             if (needLogin()) return;
-            const on = !st.fav;
-            if (!this.actionbar.favFolder) {
-              const nav = await BBDY.api.nav();
-              const folders = await BBDY.api.favFolders(nav.mid);
-              if (!folders.length) {
-                this.toast('没找到你的收藏夹', { bottom: true });
-                return;
-              }
-              this.actionbar.favFolder = folders[0];
-            }
-            const fid = this.actionbar.favFolder.id;
-            const r = await BBDY.api.fav({ bvid: item.bvid, on, addIds: fid, delIds: fid });
+            const r = await BBDY.config.toggleFav(item);
             if (r.ok) {
-              st.fav = on;
+              st.fav = r.on;
               this.interact.set(item.bvid, st);
-              this.actionbar.setState('fav', on);
-              this.toast(on ? `已收藏到「${this.actionbar.favFolder.title}」` : '已取消收藏', { bottom: true });
-            } else {
-              this.toast('操作失败：' + (r.message || r.code), { bottom: true });
+              this.actionbar.setState('fav', r.on);
+              this.actionbar.favFolder = { id: BBDY.config.getInteract(item.bvid).favFolderId, title: '' };
+              this.toast(r.hint, { bottom: true });
+              if (r.corrected) this.actionbar.setItem(item, this._interactState(item));
+            } else if (!r.needLogin) {
+              this.toast('收藏失败：' + r.hint, { bottom: true });
             }
             break;
           }

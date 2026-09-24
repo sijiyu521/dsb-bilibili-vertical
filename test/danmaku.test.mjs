@@ -258,7 +258,21 @@ await check('底栏状态同步：未登录显示登录按钮，登录后显示�
     fsBtn: mkEl(),
     muted: true,
     speed: 1,
+    volume: 1,
+    // _paintCtrlBar 会查当前引擎是否原生（决定音量滑杆能不能用）
+    _player: {
+      isNative: true,
+      vol: 1,
+      setVolume(v) {
+        this.vol = v;
+      },
+      setMuted() {},
+    },
+    _slot() {
+      return { player: this._player };
+    },
     _paintCtrlBar: B2.Overlay.prototype._paintCtrlBar,
+    _setVolume: B2.Overlay.prototype._setVolume,
   };
 
   // 未登录
@@ -280,6 +294,189 @@ await check('底栏状态同步：未登录显示登录按钮，登录后显示�
   self._paintCtrlBar.call(self);
   assert.equal(self.rateBtn.textContent, '1.5x', '设了倍速应显示倍速值');
   assert.ok(self.rateBtn.classList.contains('bbdy-on'), '非 1x 倍速应高亮');
+});
+
+await check('音量：调完不会被重绘弹回，静音/取消静音也保留原值', () => {
+  const overlaySrc = fs.readFileSync(path.join(srcDir, 'ui', 'overlay.js'), 'utf8');
+  const iconsSrc = fs.readFileSync(path.join(srcDir, 'icons.js'), 'utf8');
+  const box2 = {
+    console: { log() {}, warn() {}, error() {}, info() {} },
+    setTimeout,
+    clearTimeout,
+    setInterval,
+    clearInterval,
+    Date,
+    Math,
+    JSON,
+    Number,
+    String,
+    Object,
+    Array,
+    Promise,
+    URL,
+    URLSearchParams,
+    document: { addEventListener() {}, removeEventListener() {}, fullscreenElement: null },
+    location: { origin: 'https://www.bilibili.com', href: 'https://www.bilibili.com/' },
+    window: { addEventListener() {}, screen: { width: 1920, height: 1080 } },
+    navigator: { userAgent: 'Mozilla/5.0 test' },
+    localStorage: { getItem: () => null, setItem() {} },
+    matchMedia: () => ({ matches: false }),
+    screen: { width: 1920, height: 1080 },
+  };
+  box2.globalThis = box2;
+  const c2 = vm.createContext(box2);
+  vm.runInContext(fs.readFileSync(path.join(srcDir, 'core.js'), 'utf8'), c2, { filename: 'core.js' });
+  vm.runInContext(iconsSrc, c2, { filename: 'icons.js' });
+  vm.runInContext(overlaySrc, c2, { filename: 'overlay.js' });
+  const B3 = box2.BBDY;
+  B3.api = { isLogin: () => true };
+  B3.config = { settings: { danmaku: true, autoplay: true } };
+
+  const mkEl = () => {
+    const set = new Set();
+    return {
+      style: {},
+      classList: {
+        add: (...c) => c.forEach((x) => set.add(x)),
+        remove: (...c) => c.forEach((x) => set.delete(x)),
+        contains: (c) => set.has(c),
+        toggle: (c, on) => (on === undefined ? (set.has(c) ? set.delete(c) : set.add(c)) : on ? set.add(c) : set.delete(c)),
+      },
+      innerHTML: '',
+      textContent: '',
+      value: '100',
+      hidden: false,
+      disabled: false,
+      title: '',
+    };
+  };
+  const self = {
+    ctrlBar: mkEl(),
+    dmLoginBtn: mkEl(),
+    dmBox: mkEl(),
+    dmToggleBtn: mkEl(),
+    danmakuBtn: mkEl(),
+    muteBtn: mkEl(),
+    volBtn: mkEl(),
+    volSlider: mkEl(),
+    autoBtn: mkEl(),
+    rateBtn: mkEl(),
+    fsBtn: mkEl(),
+    muted: true,
+    speed: 1,
+    volume: 1,
+    _player: {
+      isNative: true,
+      vol: 1,
+      setVolume(v) {
+        this.vol = v;
+      },
+      setMuted() {},
+    },
+    _slot() {
+      return { player: this._player };
+    },
+    _paintCtrlBar: B3.Overlay.prototype._paintCtrlBar,
+    _setVolume: B3.Overlay.prototype._setVolume,
+  };
+
+  // 拖到 50%
+  self._setVolume.call(self, 0.5);
+  assert.equal(self.volume, 0.5, '应该记住 0.5');
+  assert.equal(self._player.vol, 0.5, '播放器音量应被设成 0.5');
+  assert.equal(self.volSlider.value, '50', '滑杆应停在 50');
+  assert.equal(self.muted, false, '调到非 0 不应算静音');
+
+  // 任意一次重绘都不该把它弹回去（这是之前的 bug）
+  self._paintCtrlBar.call(self);
+  assert.equal(self.volSlider.value, '50', '重绘后滑杆不该弹回 100');
+  assert.equal(self.volume, 0.5, '重绘不该改掉记住的音量');
+
+  // 静音：滑杆显示 0，但记住的值还在
+  self.muted = true;
+  self._paintCtrlBar.call(self);
+  assert.equal(self.volSlider.value, '0', '静音时滑杆显示 0');
+  assert.equal(self.volume, 0.5, '静音不该抹掉记住的音量');
+
+  // 取消静音：恢复 50%，而不是直接拉满
+  self.muted = false;
+  self._setVolume.call(self, self.volume || 1);
+  assert.equal(self._player.vol, 0.5, '取消静音应恢复到 50%');
+
+  // 拖到 0 时保留上次非零值，便于拖回来
+  self._setVolume.call(self, 0);
+  assert.equal(self.muted, true, '拖到 0 应视为静音');
+  assert.equal(self.volume, 0.5, '拖到 0 应保留上次的值');
+});
+
+await check('音量滑杆在 iframe 兜底引擎下会禁用（外面控制不了它的音量）', () => {
+  const overlaySrc = fs.readFileSync(path.join(srcDir, 'ui', 'overlay.js'), 'utf8');
+  const iconsSrc = fs.readFileSync(path.join(srcDir, 'icons.js'), 'utf8');
+  const box3 = {
+    console: { log() {}, warn() {}, error() {}, info() {} },
+    setTimeout,
+    clearTimeout,
+    setInterval,
+    clearInterval,
+    Date,
+    Math,
+    JSON,
+    Number,
+    String,
+    Object,
+    Array,
+    Promise,
+    URL,
+    URLSearchParams,
+    document: { addEventListener() {}, removeEventListener() {}, fullscreenElement: null },
+    location: { origin: 'https://www.bilibili.com', href: 'https://www.bilibili.com/' },
+    window: { addEventListener() {}, screen: { width: 1920, height: 1080 } },
+    navigator: { userAgent: 'Mozilla/5.0 test' },
+    localStorage: { getItem: () => null, setItem() {} },
+    matchMedia: () => ({ matches: false }),
+    screen: { width: 1920, height: 1080 },
+  };
+  box3.globalThis = box3;
+  const c3 = vm.createContext(box3);
+  vm.runInContext(fs.readFileSync(path.join(srcDir, 'core.js'), 'utf8'), c3, { filename: 'core.js' });
+  vm.runInContext(iconsSrc, c3, { filename: 'icons.js' });
+  vm.runInContext(overlaySrc, c3, { filename: 'overlay.js' });
+  const B4 = box3.BBDY;
+  B4.api = { isLogin: () => true };
+  B4.config = { settings: { danmaku: true, autoplay: true } };
+  const mkEl = () => ({
+    style: {},
+    classList: { add() {}, remove() {}, contains: () => false, toggle() {} },
+    innerHTML: '',
+    textContent: '',
+    value: '100',
+    hidden: false,
+    disabled: false,
+    title: '',
+  });
+  const self = {
+    ctrlBar: mkEl(),
+    dmLoginBtn: mkEl(),
+    dmBox: mkEl(),
+    dmToggleBtn: mkEl(),
+    danmakuBtn: mkEl(),
+    muteBtn: mkEl(),
+    volBtn: mkEl(),
+    volSlider: mkEl(),
+    autoBtn: mkEl(),
+    rateBtn: mkEl(),
+    fsBtn: mkEl(),
+    muted: false,
+    speed: 1,
+    volume: 1,
+    _slot: () => ({ player: { isNative: false } }),
+    _paintCtrlBar: B4.Overlay.prototype._paintCtrlBar,
+  };
+  self._paintCtrlBar.call(self);
+  assert.equal(self.volSlider.disabled, true, 'iframe 模式下音量滑杆应禁用');
+  self._slot = () => ({ player: { isNative: true } });
+  self._paintCtrlBar.call(self);
+  assert.equal(self.volSlider.disabled, false, '原生模式下音量滑杆应可用');
 });
 
 /* -------------------- 与控制台/输入框的接线（静态） -------------------- */
